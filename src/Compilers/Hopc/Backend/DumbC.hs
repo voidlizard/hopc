@@ -14,6 +14,7 @@ outModule exps =
     let chunks = foldl node [] exps
     in Right $ BS.intercalate "\n" chunks
 
-    where node acc (KInt n) = acc ++ [C.pack $printf "SETTMP(R1, %d);" n]
-          node acc _        = undefined
+    where node acc _        = undefined
+
+          setint n = C.pack $ printf "SETVAR(R1, ICONST(%d));" n
 
