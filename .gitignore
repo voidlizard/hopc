@@ -1,0 +1,5 @@
+src/Compilers/Hopc/Frontend/Lisp/BNFC
+dist
+cabal-dev
+*.swp
+

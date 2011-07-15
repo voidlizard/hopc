@@ -1,0 +1,12 @@
+
+Module.   Module ::= [Exp] ;
+
+String.   Exp ::= String  ;
+Integer.  Exp ::= Integer ;
+Symbol.   Exp ::= TkSymbol ;
+List.     Exp ::= "(" [Exp] ")";
+
+terminator Exp "";
+
+token TkSymbol (["!$%&|*+-/:<=>?@^_~#"]|letter (["!$%&|*+-/:<=>?@^_~#"]|letter|digit)* );
+

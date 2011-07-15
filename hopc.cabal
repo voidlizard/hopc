@@ -1,0 +1,19 @@
+name:                hopc
+version:             0.0
+synopsis:            Tiny statically typed scheme-like language targeted for embeded development
+description:         Hopc Compiler
+category:            Development
+license:             AllRightsReserved
+license-file:        LICENSE
+author:              Dmitry Zuikov
+maintainer:          dzuikov@gmail.com
+
+cabal-version:       >= 1.6
+build-type:          Simple
+
+executable  hopc
+    main-is:             Hopc.hs
+    build-depends:       base >= 4.0
+    hs-source-dirs:	     src
+    ghc-options:         -O2 -Wall
+
