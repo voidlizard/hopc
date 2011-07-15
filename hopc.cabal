@@ -9,7 +9,7 @@ author:              Dmitry Zuikov
 maintainer:          dzuikov@gmail.com
 
 cabal-version:       >= 1.6
-build-type:          Simple
+build-type:          Custom 
 
 executable  hopc
     main-is:             Hopc.hs
