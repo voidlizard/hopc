@@ -1,4 +1,8 @@
-module Compilers.Hopc.Frontend.KTree (KTree(..)) where
+module Compilers.Hopc.Frontend.KTree (KTree(..), KTreeModule) where
 
-data KTree = KTree
+import Control.Monad.Error
+
+type KTreeModule = [KTree]
+
+data KTree = KInt Integer deriving Show
 

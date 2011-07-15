@@ -12,5 +12,5 @@
 >    setCurrentDirectory rootdir 
 >    (preBuild simpleUserHooks) args flags
 >
-> main = defaultMainWithHooks ( simpleUserHooks { hookedPrograms = [simpleProgram "make"], preBuild = makeBNFC } )
-
+> main = defaultMainWithHooks simpleUserHooks
+> -- main = defaultMainWithHooks ( simpleUserHooks { hookedPrograms = [simpleProgram "make"], preBuild = makeBNFC } )
