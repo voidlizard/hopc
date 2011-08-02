@@ -1,14 +1,24 @@
-module Compilers.Hopc.Frontend.KTree (KTree(..), KTreeModule) where
+{-# LANGUAGE EmptyDataDecls, OverloadedStrings #-}
+module Compilers.Hopc.Frontend.KTree (KTree(..)
+                                     ,KId
+                                     ,KName
+                                     ) where
 
+import qualified Data.ByteString.Char8 as S
 import Control.Monad.Error
 
-type KId = String
+type KString = S.ByteString
 
-type KTreeModule = [KDef]
+type KId = KString 
 
-data KDef = KFun KId KFunArgs KTree
+type KName = KString 
 
-data KFunArgs = Int
+data KExpr = KExpr deriving Show
 
-data KTree = KInt Integer deriving Show
+data KTree =   KInt Integer
+             | KStr String
+             | KLet KId KExpr KExpr
+             | KVar KId
+             | KApp KId [KId]
+             deriving Show
 

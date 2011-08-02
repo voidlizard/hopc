@@ -1,12 +1,24 @@
 
-Module.   Module ::= [Exp] ;
+ModuleDef. Module ::= [Def] ;
 
-String.   Exp ::= String  ;
-Integer.  Exp ::= Integer ;
-Symbol.   Exp ::= TkSymbol ;
-List.     Exp ::= "(" [Exp] ")";
+EStr.    Exp ::= String  ;
+EInt.    Exp ::= Integer ;
+EAtom.   Exp ::= AtomT ;
+EList.   Exp ::= QuoT O [Exp] C;
+ELet.    Exp ::= O "let" O AtomT Exp C Exp C;
+ELambda. Exp ::= O "lambda" O [AtomT] C Exp C;
+EApply.  Exp ::= O AtomT [Exp] C;
+
+DefExp.  Def ::= O "define" AtomT Exp C;
+DeFun.   Def ::= O "define" O AtomT [AtomT] C [Exp] C;
 
 terminator Exp "";
+terminator Def "";
+terminator AtomT "";
 
-token TkSymbol (["!$%&|*+-/:<=>?@^_~#"]|letter (["!$%&|*+-/:<=>?@^_~#"]|letter|digit)* );
+position token AtomT (["!$%&|*+-/:<=>?@^_~#"]|letter (["!$%&|*+-/:<=>?@^_~#"]|letter|digit)* );
+
+position token O '(';
+position token C ')';
+position token QuoT '\'';
 
