@@ -1,11 +1,15 @@
-{-# LANGUAGE EmptyDataDecls, OverloadedStrings #-}
+{-# LANGUAGE EmptyDataDecls, OverloadedStrings, DeriveDataTypeable  #-}
 module Compilers.Hopc.Frontend.KTree (KTree(..)
                                      ,KId
                                      ,KName
                                      ,KString
                                      ) where
 
+import Data.Data
+import Data.Typeable
 import Text.PrettyPrint.HughesPJClass
+
+import Data.Generics.PlateData
 
 import qualified Data.ByteString.Char8 as S
 import Control.Monad.Error
@@ -21,11 +25,7 @@ data KTree =   KInt Integer
              | KLet KId KTree KTree
              | KVar KId
              | KApp KId [KId]
-             deriving Show
-
-
---instance Pretty KId where
---    pPrint = show
+             deriving (Show, Eq, Data, Typeable)
 
 instance Pretty KTree where
     pPrintPrec _ _ (KInt n) = integer n 

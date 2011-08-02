@@ -44,7 +44,7 @@ knorm (EAtom (AtomT (p,bs))) = return $ KVar (toString bs)
 knorm (ELet p1 p2 (AtomT (p21, bs)) eb p3 e p4) = do
     eb' <- knorm eb
     e'  <- knorm e
-    tmpname <- tmp "" (toString bs)
+    let tmpname = toString bs
     return $ KLet tmpname eb' e'
 
 knorm (EApply p1 (AtomT (p11, bs)) args p2) = do
