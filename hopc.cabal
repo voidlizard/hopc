@@ -16,6 +16,7 @@ executable  hopc
 
     build-depends:       base >= 4.0
                         ,bytestring
+                        ,prettyclass
                         ,array
                         ,mtl
 

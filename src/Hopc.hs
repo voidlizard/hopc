@@ -11,11 +11,13 @@ import qualified Compilers.Hopc.Frontend.Lisp.KNormalize as K
 --import Compilers.Hopc.Backend.DumbC
 import Debug.Trace
 
+import Text.PrettyPrint.HughesPJClass (prettyShow)
+
 main = do
     (x:_) <- getArgs
     e <- withInput parseExpr x
     let k = either (const $ error "Parse error") K.kNormalizeExp e
-    print k
+    putStrLn $ prettyShow k
     error "done"
 
 withInput :: (BS.ByteString -> b) -> String -> IO b
