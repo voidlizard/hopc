@@ -13,12 +13,10 @@ import Debug.Trace
 
 main = do
     (x:_) <- getArgs
-    withInput const x
---    s <- BS.readFile file
---    let ktree = buildKTree tree
---    let ast   = parseToAst s
---    print ast
-    error "oops"
+    e <- withInput parseExpr x
+    let k = either (const $ error "Parse error") K.kNormalizeExp e
+    print k
+    error "done"
 
 withInput :: (BS.ByteString -> b) -> String -> IO b
 
@@ -26,5 +24,5 @@ withInput fn "-" = do
     s <- BS.hGetContents stdin
     return $ fn s
 
-withInput fn x = error "File input is not supported yet" 
+withInput fn x = error "File input is not supported yet"
 

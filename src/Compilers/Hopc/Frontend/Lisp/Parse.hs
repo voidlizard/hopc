@@ -13,8 +13,9 @@ import Compilers.Hopc.Frontend.KTree
 
 parseModule :: ByteString -> Either Error Module 
 parseModule = withError . pModule . myLexer
-    where withError (Ok tree) = Right tree
-          withError (Bad s)   = Left $ ParseError s   -- TODO: normal error data
 
 parseExpr :: ByteString -> Either Error Exp
-parseExpr = undefined
+parseExpr = withError . pExp . myLexer
+
+withError (Ok tree) = Right tree
+withError (Bad s)   = Left $ ParseError s   -- TODO: normal error data
