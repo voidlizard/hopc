@@ -9,6 +9,7 @@ import Compilers.Hopc.Frontend.Lisp.Parse
 import Compilers.Hopc.Frontend.KTree
 import qualified Compilers.Hopc.Frontend.Lisp.KNormalize as K
 import qualified Compilers.Hopc.Frontend.AlphaConv as A
+import qualified Compilers.Hopc.Frontend.BetaReduction as B
 --import Compilers.Hopc.Backend.DumbC
 import Debug.Trace
 
@@ -18,7 +19,8 @@ main = do
     (x:_) <- getArgs
     e <- withInput parseExpr x
     let k = either (const $ error "Parse error") K.kNormalizeExp e
-    let k' = A.alphaConv k
+    let k' = B.betaReduce $ A.alphaConv k
+--    let k' = A.alphaConv k
     putStrLn $ prettyShow k'
     error "done"
 

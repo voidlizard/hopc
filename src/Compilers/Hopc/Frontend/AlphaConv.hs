@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
-
 module Compilers.Hopc.Frontend.AlphaConv where
 
 import qualified Data.Map as M
@@ -7,8 +5,6 @@ import Control.Monad
 import Control.Monad.State
 import Data.Maybe
 import Data.Generics.Biplate
-
-import Debug.Trace
 
 import Compilers.Hopc.Frontend.KTree
 
@@ -26,7 +22,8 @@ alphaConv k = evalState (descendBiM tr k) aInitState
             e2' <- tr e2
             return $ KLet sn e1' e2'
 
-          tr (KVar s) = getVar s >>= \sn -> return $ KVar sn
+          tr (KVar s) = getVar s >>= return . KVar
+
           tr (KApp fn args) = do
             fn'   <- getVar fn
             args' <- mapM getVar args
