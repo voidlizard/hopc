@@ -13,8 +13,7 @@ import Debug.Trace
 
 main = do
     (x:_) <- getArgs
-    undefined
---    withInput x
+    withInput const x
 --    s <- BS.readFile file
 --    let ktree = buildKTree tree
 --    let ast   = parseToAst s
