@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Compilers.Hopc.Frontend.Lisp.Parse (parseModule, parseExpr) where
+module Compilers.Hopc.Frontend.Lisp.Parse (parseExpr, parseTop) where
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as C
@@ -11,11 +11,14 @@ import Compilers.Hopc.Frontend.Lisp.BNFC.Lisp.Par
 import Compilers.Hopc.Frontend.KTree
 
 
-parseModule :: ByteString -> Either Error Module 
-parseModule = withError . pModule . myLexer
+--parseModule :: ByteString -> Either Error Module 
+--parseModule = withError . pModule . myLexer
 
 parseExpr :: ByteString -> Either Error Exp
 parseExpr = withError . pExp . myLexer
+
+parseTop :: ByteString -> Either Error TopLevel
+parseTop = withError . pTopLevel . myLexer
 
 withError (Ok tree) = Right tree
 withError (Bad s)   = Left $ ParseError s   -- TODO: normal error data

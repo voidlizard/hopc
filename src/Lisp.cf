@@ -1,5 +1,5 @@
 
-ModuleDef. Module ::= [Def] ;
+TopLevel. TopLevel ::= [Exp] ;
 
 EUnit.   Exp ::= O C ;
 EStr.    Exp ::= String  ;
@@ -7,8 +7,12 @@ EInt.    Exp ::= Integer ;
 EAtom.   Exp ::= AtomT ;
 -- EList.   Exp ::= QuoT O [Exp] C;
 ELet.    Exp ::= O "let" O AtomT Exp C Exp C;
+ELetM.   Exp ::= O "let" O [Bind] C Exp C ;
 ELambda. Exp ::= O "lambda" O [AtomT] C Exp C;
 EApply.  Exp ::= O Exp [Exp] C;
+
+EBind.   Bind ::= O AtomT Exp C;
+EDef.    Exp  ::= Def;
 
 DefExp.  Def ::= O "define" AtomT Exp C;
 DeFun.   Def ::= O "define" O AtomT [AtomT] C [Exp] C;
@@ -16,6 +20,7 @@ DeFun.   Def ::= O "define" O AtomT [AtomT] C [Exp] C;
 terminator Exp "";
 terminator Def "";
 terminator AtomT "";
+terminator Bind "";
 
 position token AtomT (["!$%&|*+-/:<=>?@^_~#"]|letter (["!$%&|*+-/:<=>?@^_~#"]|letter|digit)* );
 

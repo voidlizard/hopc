@@ -14,4 +14,5 @@ import Compilers.Hopc.Frontend.KTree
 flatten :: KTree -> KTree
 flatten k = rewriteBi tr k
     where tr (KLet x (KLet y e1 e2) e3) = Just $ (KLet y e1 (KLet x e2 e3))
+--          tr (KLetR b e) = undefined
           tr x = Nothing

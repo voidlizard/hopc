@@ -16,13 +16,16 @@ betaReduce k = evalState (descendBiM tr k) M.empty
     where tr :: KTree -> BStateM KTree
 
           tr (KLet s e1 e2) = do
-            e1'  <- tr e1
-            e1'' <- case e1' of
-                        KVar sn -> putV s sn >> return e1'
-                        e       -> return e
-
+            e1'  <- tr e1 >>= addRepl s
             e2' <- tr e2
-            return $ KLet s e1'' e2'
+            return $ KLet s e1' e2'
+
+          tr (KLetR binds e2) = do
+            binds' <- forM binds $ \(s, e) -> do
+                e' <- tr e >>= addRepl s
+                return (s, e')
+            e2' <- tr e2
+            return $ KLetR binds' e2'
 
           tr (KVar s) = getV s >>= return . KVar
 
@@ -40,4 +43,8 @@ betaReduce k = evalState (descendBiM tr k) M.empty
           getV s = do
             env <- get
             return $ maybe s id $ M.lookup s env
+
+          addRepl s e@(KVar sn) = putV s sn >> return e
+
+          addRepl s e = return e
 

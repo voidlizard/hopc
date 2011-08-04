@@ -18,9 +18,12 @@ import Text.PrettyPrint.HughesPJClass (prettyShow)
 
 main = do
     (x:_) <- getArgs
-    e <- withInput parseExpr x
-    let k = either (const $ error "Parse error") K.kNormalizeExp e
+    e <- withInput parseTop x
+--    print e
+--    error "stop"
+    let k = either (const $ error "Parse error") K.kNormalizeTop e
     let k' = L.flatten $ B.betaReduce $ A.alphaConv k
+--    let k' = B.betaReduce $ A.alphaConv k --k --L.flatten $ B.betaReduce $ A.alphaConv k
     putStrLn $ prettyShow k'
     error "done"
 

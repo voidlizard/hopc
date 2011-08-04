@@ -23,16 +23,17 @@ type KName = KString
 --data TType = TLambda | TVar
 
 data KTree =   KUnit
-             | KInt Integer
-             | KStr String
-             | KLet KId KTree KTree
+             | KInt  Integer
+             | KStr  String
+             | KLet  KId KTree KTree
+             | KLetR [(KId, KTree)] KTree
              | KVar KId
              | KLambda [KId] KTree
              | KApp KId [KId]
              deriving (Show, Eq, Data, Typeable)
 
 instance Pretty KTree where
-    pPrintPrec _ _ (KUnit)  = text "" 
+    pPrintPrec _ _ (KUnit)  = text "()" 
     pPrintPrec _ _ (KInt n) = integer n 
     pPrintPrec _ _ (KStr s) = (text . show) s
     pPrintPrec _ _ (KVar v) = text v
@@ -40,6 +41,9 @@ instance Pretty KTree where
     pPrintPrec l p (KLet i e1 e2) = prettyParen True $ text "let"
                                     <+> (prettyParen True $ text i <+> pPrintPrec l p e1) 
                                     $$ nest 2 (pPrintPrec l p e2)
+    pPrintPrec l p (KLetR binds e) = prettyParen True $ text "letrec"
+                                     <+> prettyParen True ( fsep $ map (\(n, e1) -> prettyParen True (text n <+> pPrintPrec l p e1)) binds )
+                                     $$ nest 2 (pPrintPrec l p e)
     pPrintPrec l p (KLambda args e) = prettyParen True $ text "lambda"
                                       <+> (prettyParen True (fsep $ map text args))
                                       <+> pPrintPrec l p e

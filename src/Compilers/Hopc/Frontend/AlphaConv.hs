@@ -22,6 +22,12 @@ alphaConv k = evalState (descendBiM tr k) aInitState
             e2' <- tr e2
             return $ KLet sn e1' e2'
 
+          tr (KLetR binds e2) = do
+            sn  <- mapM (replVar . fst) binds
+            e1  <- mapM (tr . snd) binds
+            e2' <- tr e2
+            return $ KLetR (zip sn e1) e2'
+
           tr (KLambda args e) = do
             vars <- mapM replVar args
             e'   <- tr e
