@@ -1,13 +1,14 @@
 
 ModuleDef. Module ::= [Def] ;
 
+EUnit.   Exp ::= O C ;
 EStr.    Exp ::= String  ;
 EInt.    Exp ::= Integer ;
 EAtom.   Exp ::= AtomT ;
 -- EList.   Exp ::= QuoT O [Exp] C;
 ELet.    Exp ::= O "let" O AtomT Exp C Exp C;
 ELambda. Exp ::= O "lambda" O [AtomT] C Exp C;
-EApply.  Exp ::= O AtomT [Exp] C;
+EApply.  Exp ::= O Exp [Exp] C;
 
 DefExp.  Def ::= O "define" AtomT Exp C;
 DeFun.   Def ::= O "define" O AtomT [AtomT] C [Exp] C;

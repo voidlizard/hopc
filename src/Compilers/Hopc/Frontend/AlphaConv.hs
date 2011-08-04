@@ -22,6 +22,11 @@ alphaConv k = evalState (descendBiM tr k) aInitState
             e2' <- tr e2
             return $ KLet sn e1' e2'
 
+          tr (KLambda args e) = do
+            vars <- mapM replVar args
+            e'   <- tr e
+            return $ KLambda vars e'
+
           tr (KVar s) = getVar s >>= return . KVar
 
           tr (KApp fn args) = do
