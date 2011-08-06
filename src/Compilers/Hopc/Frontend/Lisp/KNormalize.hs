@@ -8,7 +8,6 @@ import Text.Printf
 import Control.Monad.State
 
 import Compilers.Hopc.Frontend.Lisp.BNFC.Lisp.Abs
---import Compilers.Hopc.Frontend.Lisp.BNFC.Lisp.Par
 import Compilers.Hopc.Frontend.KTree
 
 toString :: BS.ByteString -> String
@@ -48,7 +47,7 @@ knormSeq seq = do
     (t, last') <- knormN last
     if es == []
         then return $ if isDef last then KLetR [(t, last')] KUnit else last'
-        else return $ if isDef last then KLetR (es++[(t, last')]) KUnit else last'
+        else return $ if isDef last then KLetR (es++[(t, last')]) KUnit else KLetR es last'
 
 data KNormState = KNormState { tmpId :: Int }
 
