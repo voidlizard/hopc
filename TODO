@@ -1,0 +1,13 @@
+
+BUG:
+
+(define a 22)
+(define a 33)
+(define a 12)
+(define a 66)
+
+
+dmz@x201:~/prj/hop$ cat ./td9.hop | ./hopc -
+(letrec ((a_0 22) (a_1 33) (a_2 12))
+   66)
+

@@ -46,9 +46,9 @@ knormSeq seq = do
     let (last:all) = reverse seq
     es <- mapM knormN (reverse all)
     (t, last') <- knormN last
-    if es == [] || isDef last
-        then return $ KLetR [(t, last')] KUnit
-        else return $ KLetR es last'
+    if es == []
+        then return $ if isDef last then KLetR [(t, last')] KUnit else last'
+        else return $ if isDef last then KLetR (es++[(t, last')]) KUnit else last'
 
 data KNormState = KNormState { tmpId :: Int }
 
@@ -121,8 +121,7 @@ knorm (EApply p1 (EAtom (AtomT (p12, bs))) args p2) = do
     knormApp fn args
 
 knorm (EApply p1 e args p2) = do
-    e'  <- knorm e
-    fn  <- tmp "" "fun"
+    (fn, e')  <- knormN e
     app <- knormApp fn args
     return $ KLet fn e' app
 
