@@ -23,10 +23,12 @@ main = do
 --    print e
 --    error "stop"
     let k = either (const $ error "Parse error") K.kNormalizeTop e
-    let k' = C.convert $ L.flatten $ B.betaReduce $ A.alphaConv k
+    let k' =L.flatten $ B.betaReduce $ A.alphaConv k
+    putStrLn $ prettyShow k'
+    let k'' = C.convert k'
 --    let k' = L.flatten $ B.betaReduce $ A.alphaConv k
 --    let k' = B.betaReduce $ A.alphaConv k --k --L.flatten $ B.betaReduce $ A.alphaConv k
-    putStrLn $ prettyShow k'
+    putStrLn $ prettyShow k''
     error "done"
 
 withInput :: (BS.ByteString -> b) -> String -> IO b
@@ -35,5 +37,12 @@ withInput fn "-" = do
     s <- BS.hGetContents stdin
     return $ fn s
 
-withInput fn x = error "File input is not supported yet"
+withInput fn x = do 
+    s <- BS.readFile x
+    return $ fn s
+
+test f = do
+    e <- withInput parseTop f
+    let k = either (const $ error "Parse error") K.kNormalizeTop e
+    return $ L.flatten $ B.betaReduce $ A.alphaConv k
 
