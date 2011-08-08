@@ -34,6 +34,18 @@ betaReduce k = evalState (descendBiM tr k) M.empty
             args' <- mapM getV args
             return $ KApp fn' args'
 
+          tr (KLambda args e) = do
+            let nm  = [(bn, n) | KLet bn (KVar n) _ <- universe e]
+            let nm2 = concat [bs | KLetR bs _ <- universe e]
+            let nm3 = foldl kv nm nm2
+            forM_ nm $ uncurry putV
+            e' <- tr e
+            return $ KLambda args e'
+
+            where kv acc (bn, KVar n) | n `elem` args = acc ++ [(bn, n)]
+                                      | otherwise = acc
+                  kv acc x  = acc 
+
           tr x = return x
 
           putV x s = do
