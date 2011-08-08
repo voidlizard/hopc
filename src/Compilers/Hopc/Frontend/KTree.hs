@@ -39,7 +39,7 @@ instance Pretty KTree where
     pPrintPrec _ _ (KVar v) = text v
     pPrintPrec l p (KApp n a) = prettyParen True $ text n <+> ( fsep $ map text a )
     pPrintPrec l p (KLet i e1 e2) = prettyParen True $ text "let"
-                                    <+> (prettyParen True $ text i <+> pPrintPrec l p e1) 
+                                    <+> (prettyParen True $ text i <+> pPrintPrec l p e1)
                                     $$ nest 2 (pPrintPrec l p e2)
     pPrintPrec l p (KLetR binds e) = prettyParen True $ text "letrec"
                                      <+> prettyParen True ( fsep $ map (\(n, e1) -> prettyParen True (text n <+> pPrintPrec l p e1)) binds )

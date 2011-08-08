@@ -11,6 +11,7 @@ import qualified Compilers.Hopc.Frontend.Lisp.KNormalize as K
 import qualified Compilers.Hopc.Frontend.AlphaConv as A
 import qualified Compilers.Hopc.Frontend.BetaReduction as B
 import qualified Compilers.Hopc.Frontend.LetFlatten as L
+import qualified Compilers.Hopc.Frontend.Closure as C
 --import Compilers.Hopc.Backend.DumbC
 import Debug.Trace
 
@@ -22,7 +23,8 @@ main = do
 --    print e
 --    error "stop"
     let k = either (const $ error "Parse error") K.kNormalizeTop e
-    let k' = L.flatten $ B.betaReduce $ A.alphaConv k
+    let k' = C.convert $ L.flatten $ B.betaReduce $ A.alphaConv k
+--    let k' = L.flatten $ B.betaReduce $ A.alphaConv k
 --    let k' = B.betaReduce $ A.alphaConv k --k --L.flatten $ B.betaReduce $ A.alphaConv k
     putStrLn $ prettyShow k'
     error "done"
