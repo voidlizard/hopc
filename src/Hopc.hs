@@ -24,8 +24,8 @@ main = do
 --    error "stop"
     let k = either (const $ error "Parse error") K.kNormalizeTop e
     let k' = L.flatten $ B.betaReduce $ A.alphaConv k
-    putStrLn $ prettyShow k'
-    putStrLn ""
+--    putStrLn $ prettyShow k'
+--    putStrLn ""
     let k'' = C.convert k'
 --    let k' = L.flatten $ B.betaReduce $ A.alphaConv k
 --    let k' = B.betaReduce $ A.alphaConv k --k --L.flatten $ B.betaReduce $ A.alphaConv k
