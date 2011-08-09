@@ -45,9 +45,17 @@ knormSeq seq = do
     let (last:all) = reverse seq
     es <- mapM knormN (reverse all)
     (t, last') <- knormN last
+    lastNorm <- knormTail last'
     if es == []
-        then return $ if isDef last then KLetR [(t, last')] KUnit else last'
-        else return $ if isDef last then KLetR (es++[(t, last')]) KUnit else KLetR es last'
+        then return $ if isDef last then KLetR [(t, last')] KUnit else lastNorm
+        else return $ if isDef last then KLetR (es++[(t, last')]) KUnit else KLetR es lastNorm 
+
+    where knormTail :: KTree -> KNormStateM KTree
+          knormTail l@(KLambda args k) = do
+            n <- tmp "l" "tmp"
+            return $ KLet n l (KVar n) 
+
+          knormTail x = return x 
 
 data KNormState = KNormState { tmpId :: Int }
 
