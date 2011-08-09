@@ -3,6 +3,7 @@ module Compilers.Hopc.Frontend.Closure where
 
 import qualified Data.Map as M
 import qualified Data.Set as S
+import Data.Maybe
 import Data.Either
 --import Control.Monad.Maybe
 import Control.Monad.State
@@ -51,64 +52,93 @@ convert g k =
 data Elim = Elim { efuncs :: (M.Map KId Fun), ebinds :: (M.Map KId KId) } deriving (Show)
 type ElimM = State Elim 
 
+
 eliminate :: Closure -> Closure
-eliminate k = 
-    let fns = M.fromList [ (nm, f)  | (CFun f@(Fun nm args free _)) <- universe k ]
-        b1  = [ (n, fn)   | (CLet n m@(CMakeCls fn args) _) <- universe k ] :: [(KId, KId)]
-        b2  = foldl withBind b1 $ concat [binds | (CLetR binds _) <- universe k]
-        fs  = foldl (withFn fns) (M.empty) b2
---     in trace ( show fs) k
-     in rewrite (tr fns) k
-    where withBind acc (n, b@(CMakeCls fn args)) = (n, fn) : acc
-          withBind acc x = acc
-          withFn :: M.Map KId Fun -> M.Map KId Fun -> (KId, KId) -> M.Map KId Fun
-          withFn fns m (n,fn) =
-            let d = M.lookup fn fns
-            in case d of
-                Nothing -> m
-                Just b  -> M.insert n b m
+eliminate k = evalState (descendBiM tr k) init 
+    where tr (CFun f@(Fun fn args free e)) = trace (printf "TRACE: CFun (Fun %s _ _ _)" fn) $ do
+            fnDecl fn f 
+            e' <- tr e
+            return $ CFun (Fun fn args free e')
+ 
+          tr (CLetR binds b) = trace "TRACE: tr (CLetR binds b)" $ do
+            binds' <- mapM trB binds
+            b'     <- tr b
+            return $ CLetR binds b'
 
-          tr :: M.Map KId Fun -> Closure -> Maybe Closure
-          tr fns (CApplCls n args) =
-            M.lookup n fns >>= \fb@(Fun n _ _ _) -> if hasFree fb
-                                                        then error "JOPA!"
-                                                        else Just $ CApplDir n args
-          tr fns x = Nothing
+          tr (CLet n eb@(CMakeCls fn args) e) = trace "TRACE: tr (CLet _ (CMakeCls _ _) _)" $ do
+            (_, eb') <- trB (n, eb)
+            e' <- tr e
+            return $ CLet n eb' e'
 
---    in rewriteBiM
---    let (c, s) = runState (rewriteBiM tr k) init
---    in trace (show s) $ c
---    where tr :: Closure -> ElimM (Maybe Closure)
---          tr (CFun f) = withFun f >> return Nothing
---          tr (CLetR binds _) = forM_ binds withBind >> return Nothing 
---          tr (CLet n c@(CMakeCls fn _) _) = withBind (n, c) >> return Nothing
---          tr (CApplCls fi args) = withAppl fi args
---          tr x = return Nothing
+          tr (CLet n eb e) = trace "TRACE: tr (CLet _ _ _)" $ do
+            eb' <- tr eb
+            e'  <- tr e
+            return $ CLet n eb' e'
 
---          withFun f@(Fun n _ _ _) = modify (\x -> x { efuncs = M.insert n f (efuncs x)})
+          tr x@(CApplCls n args) = do
+            fn <- getBindFun n 
+            trace (printf "TRACE: APPLY-CLOSURE %s %s" n (show fn)) $ do
+                elimAppl fn x
+--                if ok
+--                    then return $ CApplDir (n++"_OK") args
+--                    else return x
 
---          withBind (n, CMakeCls fn _) = trace ("withBind " ++ n) $ do -- modify (\x -> x { ebinds = M.insert n fn (ebinds x)})
---            st@(Elim { ebinds = eb }) <- get
---            trace ("STATE: " ++ show eb) $ do
---                put $ st { ebinds = M.insert n fn eb }
+          tr x = return x
 
---          withBind (n, _) = return ()
+          trB (n, x@(CMakeCls fn args)) = trace (printf "TRACE: trB %s" n) $ bindCls n fn >> return (n, x)
+          trB (n, x) = do
+            x' <- tr x
+            return (n, x')
 
---          withAppl :: KId -> [KId] -> ElimM (Maybe Closure)
---          withAppl fi args = trace ("withAppl " ++ fi) $ do
---            s@(Elim { ebinds = eb, efuncs = ef } ) <- get
---            trace ("\n\n --- FUNCS " ++ fi ++ " "  ++ show eb ++ " " ++ show ef) $ do
---                fn <- gets (M.lookup fi . ebinds)
---                fb <- look fn
---                return $ maybe Nothing (\f@(Fun n _ _ _) -> if not (hasFree f) then Just (CApplDir n args) else Nothing) fb
+          elimAppl (Just (Fun fn _ [] _)) (CApplCls f args) = return $ CApplDir fn args
 
---          look :: Maybe KId -> ElimM (Maybe Fun)
---          look Nothing   = return $ Nothing
---          look (Just n)  = do
---            fb <- gets (M.lookup n . efuncs)
---            return fb
+          elimAppl f x = return x
 
---          init = Elim { efuncs = M.empty, ebinds = M.empty }
+          bindCls n fn = modify (\s@(Elim{ebinds=eb}) -> s{ebinds=M.insert n fn eb})
+            
+          fnDecl n f = modify (\s@(Elim{efuncs=ef}) -> s{efuncs=M.insert n f ef})
+
+          lookBind n = gets (M.lookup n . ebinds)
+
+          lookFun Nothing = return Nothing
+          lookFun (Just s) = gets (M.lookup s . efuncs)
+
+          getBindFun n = lookBind n >>= lookFun
+
+          init = Elim M.empty M.empty
+
+--eliminate :: Closure -> Closure
+--eliminate k = evalState (transformM tr k) init
+--    where tr x@(CLet n q@(CMakeCls fn _) b) = addBnd n fn >> return x
+--          tr x@(CApplCls n args) = do
+--            nm <- jopa n
+--            return $ CApplDir nm args
+
+--          tr x@(CLetR binds b) = do
+--            bs <- mapM trB binds
+--            return $ CLetR bs b
+
+--          tr x@(CFun f@(Fun n x1 x2 x3)) = do
+--            s@(Elim {efuncs = fs}) <- get
+--            put $ s {efuncs = M.insert n f fs}
+--            return x
+
+--          tr x = return x
+
+--          trB :: (KId,Closure) -> ElimM (KId, Closure)
+
+--          trB (n, x@(CMakeCls fn args)) = addBnd n fn >> return (n, x)
+--          trB x = return x
+
+--   
+--          addBnd :: KId -> KId -> ElimM ()
+--          addBnd n b = do 
+--            s@(Elim {ebinds = eb}) <- get
+--            put $ s {ebinds = M.insert n b eb}
+
+--          jopa s = do
+--            fs <- gets ebinds
+--            if M.member s fs then return $ s ++ "_JOPA" else return $ s ++ "_PIZDETZ"
 
 hasFree (Fun _ _ free _) = free /= []
 
