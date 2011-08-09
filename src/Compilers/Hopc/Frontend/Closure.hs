@@ -79,9 +79,6 @@ eliminate k = evalState (descendBiM tr k) init
             fn <- getBindFun n 
             trace (printf "TRACE: APPLY-CLOSURE %s %s" n (show fn)) $ do
                 elimAppl fn x
---                if ok
---                    then return $ CApplDir (n++"_OK") args
---                    else return x
 
           tr x = return x
 
@@ -107,38 +104,6 @@ eliminate k = evalState (descendBiM tr k) init
 
           init = Elim M.empty M.empty
 
---eliminate :: Closure -> Closure
---eliminate k = evalState (transformM tr k) init
---    where tr x@(CLet n q@(CMakeCls fn _) b) = addBnd n fn >> return x
---          tr x@(CApplCls n args) = do
---            nm <- jopa n
---            return $ CApplDir nm args
-
---          tr x@(CLetR binds b) = do
---            bs <- mapM trB binds
---            return $ CLetR bs b
-
---          tr x@(CFun f@(Fun n x1 x2 x3)) = do
---            s@(Elim {efuncs = fs}) <- get
---            put $ s {efuncs = M.insert n f fs}
---            return x
-
---          tr x = return x
-
---          trB :: (KId,Closure) -> ElimM (KId, Closure)
-
---          trB (n, x@(CMakeCls fn args)) = addBnd n fn >> return (n, x)
---          trB x = return x
-
---   
---          addBnd :: KId -> KId -> ElimM ()
---          addBnd n b = do 
---            s@(Elim {ebinds = eb}) <- get
---            put $ s {ebinds = M.insert n b eb}
-
---          jopa s = do
---            fs <- gets ebinds
---            if M.member s fs then return $ s ++ "_JOPA" else return $ s ++ "_PIZDETZ"
 
 hasFree (Fun _ _ free _) = free /= []
 
