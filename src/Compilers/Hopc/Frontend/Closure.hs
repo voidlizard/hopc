@@ -53,40 +53,62 @@ type ElimM = State Elim
 
 eliminate :: Closure -> Closure
 eliminate k = 
-    let (c, s) = runState (rewriteBiM tr k) init
-    in trace (show s) $ c
-    where tr :: Closure -> ElimM (Maybe Closure)
-          tr (CFun f) = withFun f >> return Nothing
-          tr (CLetR binds _) = forM_ binds withBind >> return Nothing 
-          tr (CLet n c@(CMakeCls fn _) _) = withBind (n, c) >> return Nothing
-          tr (CApplCls fi args) = withAppl fi args
-          tr x = return Nothing
+    let fns = M.fromList [ (nm, f)  | (CFun f@(Fun nm args free _)) <- universe k ]
+        b1  = [ (n, fn)   | (CLet n m@(CMakeCls fn args) _) <- universe k ] :: [(KId, KId)]
+        b2  = foldl withBind b1 $ concat [binds | (CLetR binds _) <- universe k]
+        fs  = foldl (withFn fns) (M.empty) b2
+--     in trace ( show fs) k
+     in rewrite (tr fns) k
+    where withBind acc (n, b@(CMakeCls fn args)) = (n, fn) : acc
+          withBind acc x = acc
+          withFn :: M.Map KId Fun -> M.Map KId Fun -> (KId, KId) -> M.Map KId Fun
+          withFn fns m (n,fn) =
+            let d = M.lookup fn fns
+            in case d of
+                Nothing -> m
+                Just b  -> M.insert n b m
 
-          withFun f@(Fun n _ _ _) = modify (\x -> x { efuncs = M.insert n f (efuncs x)})
+          tr :: M.Map KId Fun -> Closure -> Maybe Closure
+          tr fns (CApplCls n args) =
+            M.lookup n fns >>= \fb@(Fun n _ _ _) -> if hasFree fb
+                                                        then error "JOPA!"
+                                                        else Just $ CApplDir n args
+          tr fns x = Nothing
 
-          withBind (n, CMakeCls fn _) = trace ("withBind " ++ n) $ do -- modify (\x -> x { ebinds = M.insert n fn (ebinds x)})
-            st@(Elim { ebinds = eb }) <- get
-            trace ("STATE: " ++ show eb) $ do
-                put $ st { ebinds = M.insert n fn eb }
+--    in rewriteBiM
+--    let (c, s) = runState (rewriteBiM tr k) init
+--    in trace (show s) $ c
+--    where tr :: Closure -> ElimM (Maybe Closure)
+--          tr (CFun f) = withFun f >> return Nothing
+--          tr (CLetR binds _) = forM_ binds withBind >> return Nothing 
+--          tr (CLet n c@(CMakeCls fn _) _) = withBind (n, c) >> return Nothing
+--          tr (CApplCls fi args) = withAppl fi args
+--          tr x = return Nothing
 
-          withBind (n, _) = return ()
+--          withFun f@(Fun n _ _ _) = modify (\x -> x { efuncs = M.insert n f (efuncs x)})
 
-          withAppl :: KId -> [KId] -> ElimM (Maybe Closure)
-          withAppl fi args = trace ("withAppl " ++ fi) $ do
-            s@(Elim { ebinds = eb, efuncs = ef } ) <- get
-            trace ("\n\n --- FUNCS " ++ fi ++ " "  ++ show eb ++ " " ++ show ef) $ do
-                fn <- gets (M.lookup fi . ebinds)
-                fb <- look fn
-                return $ maybe Nothing (\f@(Fun n _ _ _) -> error "JOPA!" ) fb
---            return $ maybe Nothing (\f@(Fun n _ _ _) -> if not (hasFree f) then Just (CApplDir n args) else Nothing) fb
+--          withBind (n, CMakeCls fn _) = trace ("withBind " ++ n) $ do -- modify (\x -> x { ebinds = M.insert n fn (ebinds x)})
+--            st@(Elim { ebinds = eb }) <- get
+--            trace ("STATE: " ++ show eb) $ do
+--                put $ st { ebinds = M.insert n fn eb }
 
-          look :: Maybe KId -> ElimM (Maybe Fun)
-          look Nothing   = return $ Nothing
-          look (Just n)  = do
-            fb <- gets (M.lookup n . efuncs)
-            return fb
+--          withBind (n, _) = return ()
 
-          init = Elim { efuncs = M.empty, ebinds = M.empty }
+--          withAppl :: KId -> [KId] -> ElimM (Maybe Closure)
+--          withAppl fi args = trace ("withAppl " ++ fi) $ do
+--            s@(Elim { ebinds = eb, efuncs = ef } ) <- get
+--            trace ("\n\n --- FUNCS " ++ fi ++ " "  ++ show eb ++ " " ++ show ef) $ do
+--                fn <- gets (M.lookup fi . ebinds)
+--                fb <- look fn
+--                return $ maybe Nothing (\f@(Fun n _ _ _) -> if not (hasFree f) then Just (CApplDir n args) else Nothing) fb
+
+--          look :: Maybe KId -> ElimM (Maybe Fun)
+--          look Nothing   = return $ Nothing
+--          look (Just n)  = do
+--            fb <- gets (M.lookup n . efuncs)
+--            return fb
+
+--          init = Elim { efuncs = M.empty, ebinds = M.empty }
 
 hasFree (Fun _ _ free _) = free /= []
 
