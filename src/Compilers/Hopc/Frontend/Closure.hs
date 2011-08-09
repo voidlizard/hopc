@@ -29,7 +29,7 @@ data Closure =  CInt Integer
              deriving (Show, Eq, Data, Typeable)
 
 
-data Conv = Conv { fns :: M.Map KId Fun, known :: S.Set KId, free :: S.Set KId } deriving (Show)
+data Conv = Conv { fns :: [(KId, Fun)], known :: S.Set KId, free :: S.Set KId, args :: S.Set KId } deriving (Show)
 
 type ConvM = State Conv
 
@@ -37,7 +37,7 @@ convert :: KTree -> Closure
 convert k = 
     let (cls, s) = runState (conv k) convInit
         binds = bindsOfCls cls
-    in CLetR (map bindsOfFn (M.toList (fns s)) ++ binds) (cOfCls cls)
+    in CLetR (map bindsOfFn (fns s) ++ binds) (cOfCls cls)
     where bindsOfCls (CLet n e1 e2) = [(n, e1)]
           bindsOfCls (CLetR binds e2) = binds
           bindsOfCls x = []
@@ -66,15 +66,17 @@ conv (KApp n args) = addFree n >> (return $ CApplCls n args)
 
 conv wtf = error $ "WTF? " ++ show wtf
 
-convBind (n, e@(KLambda args eb)) = do
-    addKnown n
-    knowns' <- gets known
-    let knowns = S.difference knowns' (S.fromList args)
-    st@(Conv { fns = fs }) <- get
-    trace ("KNOWNS " ++ n ++ " " ++ show knowns ++ " ARGS " ++ show args) $ do
-        let (e', s') = runState (conv eb) (st {known = knowns})
-        st <- put $ st { fns = M.insert n (funOf n args ((S.toList.free) s') e') fs `M.union` (fns s') }
-        return $ (n, CMakeCls (fname n))
+convBind (n, e@(KLambda argz eb)) = do
+--    knowns' <- gets known
+--    let knowns = S.difference knowns' (S.fromList argz)
+--    st@(Conv { fns = fs }) <- get
+--    trace ("KNOWNS " ++ n ++ " " ++ show knowns ++ " ARGS " ++ show argz) $ do
+--        let (e', s') = runState (conv eb) (st {known = knowns `S.union` (S.fromList (n:argz)), args = S.fromList argz})
+--        let free' = ( S.toList (S.difference (free s') (S.fromList (argz))))
+--        st <- put $ st { fns = (fns s') ++ [(n, funOf n argz free' e')] }
+--        addKnown n
+--        trace ("FREE! " ++ n ++ " " ++ (show free')) $ do
+--            return $ (n, CMakeCls (fname n))
 --        trace ("FREE " ++ n + " " ++ (show (free s')) $ do
 --        addFun n args ((S.toList.free) s') e'
 
@@ -83,7 +85,7 @@ convBind (n, e) = do
     e' <- conv e
     return $ (n, e')
 
-convInit = Conv M.empty S.empty S.empty
+convInit = Conv [] S.empty S.empty S.empty
 
 addFree :: KId -> ConvM ()
 addFree n = do
@@ -103,7 +105,7 @@ addKnown n = do
 addFun :: KId -> [KId] -> [KId] -> Closure -> ConvM ()
 addFun n args free bdy = do
     s@(Conv { fns = fs }) <- get
-    put $ s { fns = M.insert n (funOf n args free bdy) fs }
+    put $ s { fns = fs ++ [(n, funOf n args free bdy)] }
 
 funOf n args free bdy = (Fun (fname n) args free bdy)
 
