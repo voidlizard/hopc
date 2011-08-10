@@ -17,8 +17,8 @@ alphaConv k = evalState (descendBiM tr k) aInitState
     where tr :: KTree -> AlphaConvM KTree
 
           tr (KLet s e1 e2) = do
-            sn <- replVar s
             e1' <- tr e1
+            sn <- replVar s
             e2' <- tr e2
             return $ KLet sn e1' e2'
 
@@ -34,9 +34,13 @@ alphaConv k = evalState (descendBiM tr k) aInitState
             return $ KLetR binds' e2'
 
           tr (KLambda args e) = do
-            vars <- mapM replVar args
-            e'   <- tr e
-            return $ KLambda vars e'
+            st@(AlphaConv {aId = aid, aEnv = aenv}) <- get
+            let (v, s) = flip runState st $ do
+                vars <- mapM replVar args
+                e'   <- tr e
+                return $ KLambda vars e'
+            put st{aId = aId s}
+            return v
 
           tr (KVar s) = getVar s >>= return . KVar
 
