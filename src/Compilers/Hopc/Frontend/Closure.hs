@@ -102,7 +102,7 @@ convert g k =
               trace (printf "convBind KLambda %s (%s) free %s" n (show argz) (show free)) $ do
                   return $ (n, CMakeCls (fname n) free)
 
-              where fn (KLambda _ _) r = concat r
+              where fn (KLambda _ _) r = [] 
                     fn (KVar n )     r = concat r ++ [Right n]
                     fn (KApp n _)    r = concat r ++ [Right n]
                     fn (KLet n _ _)  r = concat r ++ [Left n]
@@ -204,7 +204,7 @@ hasFree (Fun _ _ free _) = free /= []
 isGlobal n = gs >>= (return . S.member n)
 
 addFun :: KId -> [KId] -> [KId] -> Closure -> ConvM ()
-addFun n args free bdy = trace ("TRACE: addFun " ++ n ) $ do
+addFun n args free bdy = do
     s@(Conv { fns = fs }) <- get
     let fs' = filter (not.(== n).fst) fs
     put $ s { fns = fs' ++ [(n, funOf n args free bdy)] }
