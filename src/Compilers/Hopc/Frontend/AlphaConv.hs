@@ -23,10 +23,13 @@ alphaConv k = evalState (descendBiM tr k) aInitState
             return $ KLet sn e1' e2'
 
           tr (KLetR binds e2) = do
+            forM_ binds (replVar.fst)
+
             binds' <- forM binds $ \(s, e1) -> do
-                s'  <- replVar s
+                s'  <- getVar s
                 e1' <- tr e1
                 return (s', e1')
+
             e2' <- tr e2
             return $ KLetR binds' e2'
 

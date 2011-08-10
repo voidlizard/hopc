@@ -3,6 +3,7 @@ module Compilers.Hopc.Frontend.Closure where
 
 import qualified Data.Map as M
 import qualified Data.Set as S
+import Data.List
 import Data.Maybe
 import Data.Either
 --import Control.Monad.Maybe
@@ -61,6 +62,14 @@ convert g k =
               return $ CLet n e1' e2'
 
           conv (KLetR binds e2) = do
+ 
+              st@(Conv{fns=fs1}) <- get
+              let (Conv {fns=fs}) = flip execState st $ do forM_ binds convBind
+
+--              trace ( "FWD DECLS: " ++ show s ) $ undefined
+
+              put st { fns = fs1 ++ fs }
+
               binds' <- forM binds convBind
               e2' <- conv e2
               return $ CLetR binds' e2'
@@ -69,7 +78,7 @@ convert g k =
               g <- isGlobal n
               fs <- gets fns
               let fn = lookup n fs
-              let nofree = not $ if isJust fn then hasFree (fromJust fn) else False
+              let nofree = not $ if isJust fn then hasFree (fromJust fn) else True --False --False -- error $ "call of unknown function: " ++ fn --False
               let fn = if g then n else (fname n)
               return $ if g || nofree then CApplDir fn args else CApplCls n args
 
@@ -193,7 +202,8 @@ isGlobal n = gs >>= (return . S.member n)
 addFun :: KId -> [KId] -> [KId] -> Closure -> ConvM ()
 addFun n args free bdy = do
     s@(Conv { fns = fs }) <- get
-    put $ s { fns = fs ++ [(n, funOf n args free bdy)] }
+    let fs' = filter (not.(== n).fst) fs
+    put $ s { fns = fs' ++ [(n, funOf n args free bdy)] }
 
 funOf n args free bdy = (Fun (fname n) args free bdy)
 

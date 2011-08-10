@@ -30,6 +30,7 @@ main = do
     putStrLn $ prettyShow k'
     putStrLn ""
     let k'' = E.eliminate $ C.convert globals k'
+--    let k'' = C.convert globals k'
 --    let k' = L.flatten $ B.betaReduce $ A.alphaConv k
 --    let k' = B.betaReduce $ A.alphaConv k --k --L.flatten $ B.betaReduce $ A.alphaConv k
     putStrLn $ prettyShow k''
