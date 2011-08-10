@@ -68,7 +68,7 @@ convert g k =
 
 --              trace ( "FWD DECLS: " ++ show s ) $ undefined
 
-              put st { fns = fs1 ++ fs }
+              put st { fns = fs1 ++ filter (not.(flip elem fs1)) fs }
 
               binds' <- forM binds convBind
               e2' <- conv e2
@@ -78,7 +78,7 @@ convert g k =
               g <- isGlobal n
               fs <- gets fns
               let fn = lookup n fs
-              let nofree = not $ if isJust fn then hasFree (fromJust fn) else True --False --False -- error $ "call of unknown function: " ++ fn --False
+              let nofree = not $ if isJust fn then hasFree (fromJust fn) else False --False -- error $ "call of unknown function: " ++ fn --False
               let fn = if g then n else (fname n)
               return $ if g || nofree then CApplDir fn args else CApplCls n args
 
@@ -87,19 +87,22 @@ convert g k =
           convBind (n, e@(KLambda argz eb)) = trace (printf "TRACE: convBind %s" n) $ do
               globs <- gs
               let (l, r) = partitionEithers $ para fn eb
+
+              trace ("TRACE: para " ++ n ++ " " ++ " " ++ (show l) ++ (show r)) $ return () 
+
               let fset = S.difference (S.fromList r) (S.fromList (n : l ++ argz) `S.union` globs)
               let rset = S.fromList r
               
               eb' <- conv eb
               
-              let live = [n | CApplCls n _ <- universe eb' ] ++ [n | CVar n <- universe eb']
+              let live = concat $ [ n:ns | CApplCls n ns <- universe eb' ] ++ [ [n] | CVar n <- universe eb'] ++ [ ns | CMakeCls _ ns <- universe eb']
               let free = filter (flip elem live) $ filter (flip S.member fset) r
 
               addFun n argz free eb'
               trace (printf "convBind KLambda %s (%s) free %s" n (show argz) (show free)) $ do
                   return $ (n, CMakeCls (fname n) free)
 
-              where fn (KLambda _ _) r = []
+              where fn (KLambda _ _) r = concat r
                     fn (KVar n )     r = concat r ++ [Right n]
                     fn (KApp n _)    r = concat r ++ [Right n]
                     fn (KLet n _ _)  r = concat r ++ [Left n]
@@ -200,7 +203,7 @@ hasFree (Fun _ _ free _) = free /= []
 isGlobal n = gs >>= (return . S.member n)
 
 addFun :: KId -> [KId] -> [KId] -> Closure -> ConvM ()
-addFun n args free bdy = do
+addFun n args free bdy = trace ("TRACE: addFun " ++ n ) $ do
     s@(Conv { fns = fs }) <- get
     let fs' = filter (not.(== n).fst) fs
     put $ s { fns = fs' ++ [(n, funOf n args free bdy)] }
