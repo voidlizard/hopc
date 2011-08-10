@@ -40,7 +40,7 @@ convert :: [KId] -> KTree -> Closure
 convert g k = 
     let (cls, s) = runState (conv k) (convInit g)
         binds = bindsOfCls cls
-    in eliminate $ convDirectCls $ CLetR (map bindsOfFn (fns s) ++ binds) (cOfCls cls)
+    in convDirectCls $ CLetR (map bindsOfFn (fns s) ++ binds) (cOfCls cls)
 --    in convDirectCls $ CLetR (map bindsOfFn (fns s) ++ binds) (cOfCls cls)
     where bindsOfCls (CLet n e1 e2) = [(n, e1)]
           bindsOfCls (CLetR binds e2) = binds
@@ -184,47 +184,6 @@ convDirectCls k = evalState (descendBiM tr k) init
 
           init = ConvDir M.empty M.empty S.empty
 
-data Elim = Elim { elenv :: S.Set KId } 
-type ElimM = State Elim 
-
-eliminate :: Closure -> Closure
-eliminate k = trace "TRACE: eliminate" $ 
-    evalState (descendBiM tr k) init
-    where tr :: Closure -> ElimM Closure
-
-          tr x@(CLetR binds e) = do
-
-            binds' <- mapM trB binds
-            e'     <- tr e
-
-            let ebs = map snd binds' ++ [e']
-            let live = S.fromList $ concat $ map usage ebs
-
-            let binds'' = filter (flt live)  binds' -- ((flip S.member live) . fst )
-
-            return $ CLetR binds'' e'
-
-          tr (CFun (Fun fn args free e)) = do
-            e' <- tr e
-            return $ CFun (Fun fn args free e')
-
-          tr x = return x
-
-          trB (n, e)  = do
-            e' <- tr e
-            return (n, e')
-
-          flt live (n, (CMakeCls _ _)) = S.member n live
-          flt live x = True
-
-          usage x = para u x
-          u (CApplCls n args) r = concat r ++ n:args
-          u (CApplDir n args) r = concat r ++ args
-          u (CVar n) r = concat r ++ [n]
-          u (CMakeCls _ args) r = concat r ++ args
-          u x r = concat r
-
-          init = Elim S.empty
 
 gs :: ConvM (S.Set KId)
 gs = gets glob 

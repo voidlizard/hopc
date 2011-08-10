@@ -12,6 +12,7 @@ import qualified Compilers.Hopc.Frontend.AlphaConv as A
 import qualified Compilers.Hopc.Frontend.BetaReduction as B
 import qualified Compilers.Hopc.Frontend.LetFlatten as L
 import qualified Compilers.Hopc.Frontend.Closure as C
+import qualified Compilers.Hopc.Frontend.Eliminate as E
 --import Compilers.Hopc.Backend.DumbC
 import Debug.Trace
 
@@ -28,7 +29,7 @@ main = do
     let k' = L.flatten $ B.betaReduce $ A.alphaConv k
     putStrLn $ prettyShow k'
     putStrLn ""
-    let k'' = C.convert globals k'
+    let k'' = E.eliminate $ C.convert globals k'
 --    let k' = L.flatten $ B.betaReduce $ A.alphaConv k
 --    let k' = B.betaReduce $ A.alphaConv k --k --L.flatten $ B.betaReduce $ A.alphaConv k
     putStrLn $ prettyShow k''
