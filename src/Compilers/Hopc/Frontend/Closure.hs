@@ -49,9 +49,8 @@ convert g k =
           cOfCls e = e
           bindsOfFn (n, f@(Fun nm args free c)) = (fname n, CFun f)
 
-data Elim = Elim { efuncs :: (M.Map KId Fun), ebinds :: (M.Map KId KId) } deriving (Show)
+data Elim = Elim { efuncs :: (M.Map KId Fun), ebinds :: (M.Map KId (KId, [KId])), evars :: S.Set KId } deriving (Show)
 type ElimM = State Elim 
-
 
 eliminate :: Closure -> Closure
 eliminate k = evalState (descendBiM tr k) init 
@@ -71,6 +70,7 @@ eliminate k = evalState (descendBiM tr k) init
             return $ CLet n eb' e'
 
           tr (CLet n eb e) = trace "TRACE: tr (CLet _ _ _)" $ do
+            bindVar n
             eb' <- tr eb
             e'  <- tr e
             return $ CLet n eb' e'
@@ -82,27 +82,51 @@ eliminate k = evalState (descendBiM tr k) init
 
           tr x = return x
 
-          trB (n, x@(CMakeCls fn args)) = trace (printf "TRACE: trB %s" n) $ bindCls n fn >> return (n, x)
+          trB (n, x@(CMakeCls fn args)) = trace (printf "TRACE: trB %s" n) $ 
+            bindCls n (fn, args) >> return (n, x)
+
           trB (n, x) = do
+            bindVar n
             x' <- tr x
             return (n, x')
 
           elimAppl (Just (Fun fn _ [] _)) (CApplCls f args) = return $ CApplDir fn args
+          
+          elimAppl (Just (Fun fn _ free _)) x@(CApplCls f args) =
+            trace (printf "TRACE: call-closure %s %s {%s}" f (show args) (show free)) $ do
+                cls <- getBindCls f
+                elimAppl2 cls x
 
           elimAppl f x = return x
 
+          elimAppl2 (Just (fn, vars)) x@(CApplCls f args) = trace ( printf "TRACE: elimAppl2 %s {%s} %s" f (show vars) (show args) ) $ do
+            ev <- gets evars
+            let avail = foldl (&&) True $ map (flip S.member ev) vars
+            trace ("TRACE: Elim " ++ show ev ++ " " ++ show avail) $ do
+                if avail
+                    then return $ CApplDir fn (args ++ vars)
+                    else return x
+
+          elimAppl2 Nothing x = return x
+
           bindCls n fn = modify (\s@(Elim{ebinds=eb}) -> s{ebinds=M.insert n fn eb})
-            
+           
+          bindVar n = modify (\s@(Elim{evars=ev}) -> s{evars=S.insert n ev})
+
           fnDecl n f = modify (\s@(Elim{efuncs=ef}) -> s{efuncs=M.insert n f ef})
 
           lookBind n = gets (M.lookup n . ebinds)
 
           lookFun Nothing = return Nothing
-          lookFun (Just s) = gets (M.lookup s . efuncs)
+          lookFun (Just (s, _)) = gets (M.lookup s . efuncs)
 
+          lookCls Nothing  = return Nothing
+          lookCls (Just x) = return (Just x)
+ 
           getBindFun n = lookBind n >>= lookFun
+          getBindCls n = lookBind n >>= lookCls
 
-          init = Elim M.empty M.empty
+          init = Elim M.empty M.empty S.empty
 
 
 hasFree (Fun _ _ free _) = free /= []
@@ -125,7 +149,11 @@ conv (KLetR binds e2) = do
 
 conv (KApp n args) = do
     g <- isGlobal n
-    return $ if g then CApplDir n args else CApplCls n args
+    fs <- gets fns
+    let fn = lookup n fs
+    let nofree = not $ if isJust fn then hasFree (fromJust fn) else False
+    let fn = if g then n else (fname n)
+    return $ if g || nofree then CApplDir fn args else CApplCls n args
 
 conv wtf = error $ "WTF? " ++ show wtf
 
@@ -133,11 +161,18 @@ convBind (n, e@(KLambda argz eb)) = do
     globs <- gs
     let (l, r) = partitionEithers $ para fn eb
     let fset = S.difference (S.fromList r) (S.fromList (n : l ++ argz) `S.union` globs)
-    let free = filter (flip S.member fset) r
+    let rset = S.fromList r
+    
     eb' <- conv eb
-    addFun n argz free eb' 
-    return $ (n, CMakeCls (fname n) free)
-    where fn (KLambda _ _) r = [] 
+    
+    let live = [n | CApplCls n _ <- universe eb' ] ++ [n | CVar n <- universe eb']
+    let free = filter (flip elem live) $ filter (flip S.member fset) r
+
+    addFun n argz free eb'
+    trace (printf "convBind KLambda %s (%s) free %s" n (show argz) (show free)) $ do
+        return $ (n, CMakeCls (fname n) free)
+
+    where fn (KLambda _ _) r = []
           fn (KVar n )     r = concat r ++ [Right n]
           fn (KApp n _)    r = concat r ++ [Right n]
           fn (KLet n _ _)  r = concat r ++ [Left n]
@@ -166,7 +201,7 @@ fname n = "fun_" ++ n
 
 instance Pretty Closure where
     pPrintPrec _ _ (CUnit)  = text "()" 
-    pPrintPrec _ _ (CInt n) = integer n 
+    pPrintPrec _ _ (CInt n) = integer n
     pPrintPrec _ _ (CStr s) = (text.show) s
     pPrintPrec _ _ (CVar v) = text v
     pPrintPrec l p (CFun (Fun n args free e)) = prettyParen True $ text "func"
