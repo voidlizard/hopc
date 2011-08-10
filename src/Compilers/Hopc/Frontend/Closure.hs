@@ -174,6 +174,7 @@ convDirectCls k = evalState (descendBiM tr k) init
                     else return x
 
           elimAppl2 Nothing x = return x
+          elimAppl2 (Just _) x = return x
 
           bindCls n fn = modify (\s@(ConvDir{ebinds=eb}) -> s{ebinds=M.insert n fn eb})
            

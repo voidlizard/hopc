@@ -33,16 +33,9 @@ eliminate k = trace "TRACE: eliminate" $
                 else return e2'
 
           tr x@(CLetR binds e) = do
-
-            binds' <- mapM trB binds
             e'     <- tr e
-
-            let ebs = map snd binds' ++ [e']
-            let live = S.fromList $ concat $ map usage ebs
-
-            let binds'' = filter (flt live)  binds' -- ((flip S.member live) . fst )
-
-            return $ CLetR binds'' e'
+            binds' <- elim e [] (reverse binds) --mapM trB binds
+            return $ CLetR binds' e'
 
           tr (CFun (Fun fn args free e)) = do
             e' <- tr e
@@ -54,8 +47,7 @@ eliminate k = trace "TRACE: eliminate" $
             e' <- tr e
             return (n, e')
 
---          flt live (n, (CMakeCls _ _)) = S.member n live
---          flt live x = True 
+          flt live (n, (CFun _)) = S.member n live
           flt live (n, e) = S.member n live || effect e
 
           usage x = para u x
@@ -67,8 +59,20 @@ eliminate k = trace "TRACE: eliminate" $
 
           init = Elim S.empty
 
+          elim e l (r:rs) = do
+            let ebs = e : map snd l
+            let live = S.fromList $ concat $ map usage ebs
+            r' <- trB r
+            if flt live r'
+              then elim e (r':l) rs
+              else elim e l rs
+
+          elim e l [] = return l
+
 effect :: Closure -> Bool
 effect k = foldl (||) False $ para eff k
     where eff (CVar n) r = False : concat r
           eff (CMakeCls n args) r = False : concat r
+          eff (CFun (Fun n _ _ e)) r = False : concat r
           eff x r = True : concat r
+
