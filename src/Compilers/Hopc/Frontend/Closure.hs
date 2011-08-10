@@ -40,7 +40,8 @@ convert :: [KId] -> KTree -> Closure
 convert g k = 
     let (cls, s) = runState (conv k) (convInit g)
         binds = bindsOfCls cls
-    in eliminate $ CLetR (map bindsOfFn (fns s) ++ binds) (cOfCls cls)
+    in eliminate $ convDirectCls $ CLetR (map bindsOfFn (fns s) ++ binds) (cOfCls cls)
+--    in convDirectCls $ CLetR (map bindsOfFn (fns s) ++ binds) (cOfCls cls)
     where bindsOfCls (CLet n e1 e2) = [(n, e1)]
           bindsOfCls (CLetR binds e2) = binds
           bindsOfCls x = []
@@ -49,11 +50,66 @@ convert g k =
           cOfCls e = e
           bindsOfFn (n, f@(Fun nm args free c)) = (fname n, CFun f)
 
-data Elim = Elim { efuncs :: (M.Map KId Fun), ebinds :: (M.Map KId (KId, [KId])), evars :: S.Set KId } deriving (Show)
-type ElimM = State Elim 
+          conv KUnit = return CUnit 
+          conv (KInt n) = return $ CInt n
+          conv (KStr s) = return $ CStr s
 
-eliminate :: Closure -> Closure
-eliminate k = evalState (descendBiM tr k) init 
+          conv (KVar n) = return $ CVar n
+
+          conv (KLet n e1 e2) = do
+              (n', e1') <- convBind (n, e1)
+              e2' <- conv e2
+              return $ CLet n e1' e2'
+
+          conv (KLetR binds e2) = do
+              binds' <- forM binds convBind
+              e2' <- conv e2
+              return $ CLetR binds' e2'
+
+          conv (KApp n args) = do
+              g <- isGlobal n
+              fs <- gets fns
+              let fn = lookup n fs
+              let nofree = not $ if isJust fn then hasFree (fromJust fn) else False
+              let fn = if g then n else (fname n)
+              return $ if g || nofree then CApplDir fn args else CApplCls n args
+
+          conv wtf = error $ "WTF? " ++ show wtf
+
+          convBind (n, e@(KLambda argz eb)) = do
+              globs <- gs
+              let (l, r) = partitionEithers $ para fn eb
+              let fset = S.difference (S.fromList r) (S.fromList (n : l ++ argz) `S.union` globs)
+              let rset = S.fromList r
+              
+              eb' <- conv eb
+              
+              let live = [n | CApplCls n _ <- universe eb' ] ++ [n | CVar n <- universe eb']
+              let free = filter (flip elem live) $ filter (flip S.member fset) r
+
+              addFun n argz free eb'
+              trace (printf "convBind KLambda %s (%s) free %s" n (show argz) (show free)) $ do
+                  return $ (n, CMakeCls (fname n) free)
+
+              where fn (KLambda _ _) r = []
+                    fn (KVar n )     r = concat r ++ [Right n]
+                    fn (KApp n _)    r = concat r ++ [Right n]
+                    fn (KLet n _ _)  r = concat r ++ [Left n]
+                    fn (KLetR bs _)  r = concat r ++ map (Left . fst) bs
+                    fn x r             = concat r
+
+          convBind (n, e) = do
+              e' <- conv e
+              return $ (n, e')
+
+          convInit g = Conv [] (S.fromList g)
+
+
+data ConvDir = ConvDir { efuncs :: (M.Map KId Fun), ebinds :: (M.Map KId (KId, [KId])), evars :: S.Set KId } deriving (Show)
+type ConvDirM = State ConvDir 
+
+convDirectCls :: Closure -> Closure
+convDirectCls k = evalState (descendBiM tr k) init 
     where tr (CFun f@(Fun fn args free e)) = trace (printf "TRACE: CFun (Fun %s _ _ _)" fn) $ do
             fnDecl fn f 
             e' <- tr e
@@ -102,18 +158,18 @@ eliminate k = evalState (descendBiM tr k) init
           elimAppl2 (Just (fn, vars)) x@(CApplCls f args) = trace ( printf "TRACE: elimAppl2 %s {%s} %s" f (show vars) (show args) ) $ do
             ev <- gets evars
             let avail = foldl (&&) True $ map (flip S.member ev) vars
-            trace ("TRACE: Elim " ++ show ev ++ " " ++ show avail) $ do
+            trace ("TRACE: ConvDir " ++ show ev ++ " " ++ show avail) $ do
                 if avail
                     then return $ CApplDir fn (args ++ vars)
                     else return x
 
           elimAppl2 Nothing x = return x
 
-          bindCls n fn = modify (\s@(Elim{ebinds=eb}) -> s{ebinds=M.insert n fn eb})
+          bindCls n fn = modify (\s@(ConvDir{ebinds=eb}) -> s{ebinds=M.insert n fn eb})
            
-          bindVar n = modify (\s@(Elim{evars=ev}) -> s{evars=S.insert n ev})
+          bindVar n = modify (\s@(ConvDir{evars=ev}) -> s{evars=S.insert n ev})
 
-          fnDecl n f = modify (\s@(Elim{efuncs=ef}) -> s{efuncs=M.insert n f ef})
+          fnDecl n f = modify (\s@(ConvDir{efuncs=ef}) -> s{efuncs=M.insert n f ef})
 
           lookBind n = gets (M.lookup n . ebinds)
 
@@ -126,67 +182,54 @@ eliminate k = evalState (descendBiM tr k) init
           getBindFun n = lookBind n >>= lookFun
           getBindCls n = lookBind n >>= lookCls
 
-          init = Elim M.empty M.empty S.empty
+          init = ConvDir M.empty M.empty S.empty
 
+data Elim = Elim { elenv :: S.Set KId } 
+type ElimM = State Elim 
 
-hasFree (Fun _ _ free _) = free /= []
+eliminate :: Closure -> Closure
+eliminate k = trace "TRACE: eliminate" $ 
+    evalState (descendBiM tr k) init
+    where tr :: Closure -> ElimM Closure
 
-conv KUnit = return CUnit 
-conv (KInt n) = return $ CInt n
-conv (KStr s) = return $ CStr s
+          tr x@(CLetR binds e) = do
 
-conv (KVar n) = return $ CVar n
+            binds' <- mapM trB binds
+            e'     <- tr e
 
-conv (KLet n e1 e2) = do
-    (n', e1') <- convBind (n, e1)
-    e2' <- conv e2
-    return $ CLet n e1' e2'
+            let ebs = map snd binds' ++ [e']
+            let live = S.fromList $ concat $ map usage ebs
 
-conv (KLetR binds e2) = do
-    binds' <- forM binds convBind
-    e2' <- conv e2
-    return $ CLetR binds' e2'
+            let binds'' = filter (flt live)  binds' -- ((flip S.member live) . fst )
 
-conv (KApp n args) = do
-    g <- isGlobal n
-    fs <- gets fns
-    let fn = lookup n fs
-    let nofree = not $ if isJust fn then hasFree (fromJust fn) else False
-    let fn = if g then n else (fname n)
-    return $ if g || nofree then CApplDir fn args else CApplCls n args
+            return $ CLetR binds'' e'
 
-conv wtf = error $ "WTF? " ++ show wtf
+          tr (CFun (Fun fn args free e)) = do
+            e' <- tr e
+            return $ CFun (Fun fn args free e')
 
-convBind (n, e@(KLambda argz eb)) = do
-    globs <- gs
-    let (l, r) = partitionEithers $ para fn eb
-    let fset = S.difference (S.fromList r) (S.fromList (n : l ++ argz) `S.union` globs)
-    let rset = S.fromList r
-    
-    eb' <- conv eb
-    
-    let live = [n | CApplCls n _ <- universe eb' ] ++ [n | CVar n <- universe eb']
-    let free = filter (flip elem live) $ filter (flip S.member fset) r
+          tr x = return x
 
-    addFun n argz free eb'
-    trace (printf "convBind KLambda %s (%s) free %s" n (show argz) (show free)) $ do
-        return $ (n, CMakeCls (fname n) free)
+          trB (n, e)  = do
+            e' <- tr e
+            return (n, e')
 
-    where fn (KLambda _ _) r = []
-          fn (KVar n )     r = concat r ++ [Right n]
-          fn (KApp n _)    r = concat r ++ [Right n]
-          fn (KLet n _ _)  r = concat r ++ [Left n]
-          fn (KLetR bs _)  r = concat r ++ map (Left . fst) bs
-          fn x r             = concat r
+          flt live (n, (CMakeCls _ _)) = S.member n live
+          flt live x = True
 
-convBind (n, e) = do
-    e' <- conv e
-    return $ (n, e')
+          usage x = para u x
+          u (CApplCls n args) r = concat r ++ n:args
+          u (CApplDir n args) r = concat r ++ args
+          u (CVar n) r = concat r ++ [n]
+          u (CMakeCls _ args) r = concat r ++ args
+          u x r = concat r
 
-convInit g = Conv [] (S.fromList g)
+          init = Elim S.empty
 
 gs :: ConvM (S.Set KId)
 gs = gets glob 
+
+hasFree (Fun _ _ free _) = free /= []
 
 isGlobal n = gs >>= (return . S.member n)
 
