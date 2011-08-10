@@ -41,7 +41,6 @@ convert g k =
     let (cls, s) = runState (conv k) (convInit g)
         binds = bindsOfCls cls
     in convDirectCls $ CLetR (map bindsOfFn (fns s) ++ binds) (cOfCls cls)
---    in convDirectCls $ CLetR (map bindsOfFn (fns s) ++ binds) (cOfCls cls)
     where bindsOfCls (CLet n e1 e2) = [(n, e1)]
           bindsOfCls (CLetR binds e2) = binds
           bindsOfCls x = []
@@ -76,7 +75,7 @@ convert g k =
 
           conv wtf = error $ "WTF? " ++ show wtf
 
-          convBind (n, e@(KLambda argz eb)) = do
+          convBind (n, e@(KLambda argz eb)) = trace (printf "TRACE: convBind %s" n) $ do
               globs <- gs
               let (l, r) = partitionEithers $ para fn eb
               let fset = S.difference (S.fromList r) (S.fromList (n : l ++ argz) `S.union` globs)
@@ -103,7 +102,6 @@ convert g k =
               return $ (n, e')
 
           convInit g = Conv [] (S.fromList g)
-
 
 data ConvDir = ConvDir { efuncs :: (M.Map KId Fun), ebinds :: (M.Map KId (KId, [KId])), evars :: S.Set KId } deriving (Show)
 type ConvDirM = State ConvDir 
