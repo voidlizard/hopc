@@ -37,9 +37,9 @@ main = do
                 do liftIO $ putStrLn "PREVED FROM COMPILER MONAD"
                    k <- parseTop s >>= K.kNormalizeTop >>= A.alphaConvM 
                                    >>= B.betaReduceM >>= L.flattenM
-                   c1 <- C.convert k
+                   c1 <- C.convert [] k
 --                   let k' = E.eliminate $ C.convert globals k
-                   liftIO $ putStrLn $ prettyShow k
+                   liftIO $ putStrLn $ prettyShow c1 
 
         reportStatus st
     --            >>= K.kNorm 

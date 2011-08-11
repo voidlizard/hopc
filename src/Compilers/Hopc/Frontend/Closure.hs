@@ -8,6 +8,7 @@ import Data.Maybe
 import Data.Either
 --import Control.Monad.Maybe
 import Control.Monad.State
+import Control.Monad.Trans
 import Data.Data
 import Data.Typeable
 import Data.Generics.PlateData
@@ -16,6 +17,7 @@ import Text.PrettyPrint.HughesPJClass
 import Text.Printf
 import Debug.Trace
 
+import Compilers.Hopc.Compile
 import Compilers.Hopc.Frontend.KTree
 
 data Fun = Fun KId [KId] [KId] Closure deriving (Show, Eq, Data, Typeable)
@@ -35,13 +37,13 @@ data Closure =  CInt Integer
 
 data Conv = Conv { fns :: [(KId, Fun)], glob :: S.Set KId } deriving (Show)
 
-type ConvM = State Conv
+type ConvM = StateT Conv CompileM
 
-convert :: [KId] -> KTree -> Closure
-convert g k = 
-    let (cls, s) = runState (conv k) (convInit g)
-        binds = bindsOfCls cls
-    in convDirectCls $ CLetR (map bindsOfFn (fns s) ++ binds) (cOfCls cls)
+convert :: [KId] -> KTree -> CompileM Closure
+convert g k = do
+    (cls, s) <- runStateT (conv k) (convInit g)
+    let binds = bindsOfCls cls
+    return $ convDirectCls $ CLetR (map bindsOfFn (fns s) ++ binds) (cOfCls cls)
     where bindsOfCls (CLet n e1 e2) = [(n, e1)]
           bindsOfCls (CLetR binds e2) = binds
           bindsOfCls x = []
@@ -49,6 +51,8 @@ convert g k =
           cOfCls (CLetR _ e) = e
           cOfCls e = e
           bindsOfFn (n, f@(Fun nm args free c)) = (fname n, CFun f)
+
+          conv :: KTree -> ConvM Closure
 
           conv KUnit = return CUnit 
           conv (KInt n) = return $ CInt n
@@ -62,14 +66,9 @@ convert g k =
               return $ CLet n e1' e2'
 
           conv (KLetR binds e2) = do
- 
               st@(Conv{fns=fs1}) <- get
-              let (Conv {fns=fs}) = flip execState st $ do forM_ binds convBind
-
---              trace ( "FWD DECLS: " ++ show s ) $ undefined
-
+              (Conv {fns=fs}) <- execStateT (lift $ forM_ binds convBind) st
               put st { fns = fs1 ++ filter (not.(flip elem fs1)) fs }
-
               binds' <- forM binds convBind
               e2' <- conv e2
               return $ CLetR binds' e2'
@@ -201,6 +200,7 @@ gs = gets glob
 
 hasFree (Fun _ _ free _) = free /= []
 
+isGlobal :: KId -> ConvM Bool
 isGlobal n = gs >>= (return . S.member n)
 
 addFun :: KId -> [KId] -> [KId] -> Closure -> ConvM ()
