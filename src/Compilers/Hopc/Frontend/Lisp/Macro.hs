@@ -6,7 +6,7 @@ import Compilers.Hopc.Compile
 
 import Compilers.Hopc.Frontend.Lisp.KNormalize (toString)
 import Compilers.Hopc.Frontend.Lisp.BNFC.Lisp.Abs
-import Compilers.Hopc.Frontend.Lisp.MacroEngine
+import Compilers.Hopc.Frontend.Lisp.MacroExpand
 
 import Control.Monad
 
@@ -31,9 +31,7 @@ exp  (ELambda o0 o atomts c1 e c) = do
     e' <- exp e
     return $ ELambda o0 o atomts c1 e' c
 
-exp (EApply p1 (EAtom (AtomT (p12, "$$"))) args p2) = do
-    let ss = map atom args
-    error  $ "got compiler macro " ++ show ss
+exp m@(EApply p1 (EAtom (AtomT (p12, "$$"))) args p2) = runMacro m
 
 exp (EApply p1 (EAtom (AtomT (p12, bs))) args p2) = do
     args' <- mapM exp args
@@ -56,8 +54,4 @@ expDef (DeFun o0 o atomt atomts c1 es c) = do
     es' <- mapM exp es
     return $ DeFun o0 o atomt atomts c1 es' c
 
-atom (EAtom (AtomT (_, bs))) = toString bs
-atom (EStr x) = x
-atom (EInt x) = show x
-atom _ = ""
 
