@@ -196,13 +196,13 @@ convDirectCls k = evalState (descendBiM tr k) init
 
 
 gs :: ConvM (S.Set KId)
-gs = return $ S.empty
+gs = lift names
 
 hasFree (Fun _ _ free _) = free /= []
 
 isGlobal :: KId -> ConvM Bool
---isGlobal n = gs >>= (return . S.member n)
-isGlobal n = return $ False -- TODO: use CompileM monad to check globals 
+isGlobal n = gs >>= (return . S.member n)
+--isGlobal n = return $ False -- TODO: use CompileM monad to check globals 
 
 addFun :: KId -> [KId] -> [KId] -> Closure -> ConvM ()
 addFun n args free bdy = do

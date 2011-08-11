@@ -8,6 +8,7 @@ import Data.Either
 import Control.Monad.Error
 import Compilers.Hopc.Frontend.Lisp.Parse
 import Compilers.Hopc.Frontend.KTree
+import qualified Compilers.Hopc.Frontend.Lisp.Macro  as M
 import qualified Compilers.Hopc.Frontend.Lisp.KNormalize as K
 import qualified Compilers.Hopc.Frontend.AlphaConv as A
 import qualified Compilers.Hopc.Frontend.BetaReduction as B
@@ -20,13 +21,12 @@ import qualified Compilers.Hopc.Typing.Infer as I
 import Compilers.Hopc.Compile
 
 import qualified Compilers.Hopc.Frontend.KTyped as KT
+import Compilers.Hopc.Frontend.Types
 
 --import Compilers.Hopc.Backend.DumbC
 import Debug.Trace
 
 import Text.PrettyPrint.HughesPJClass (prettyShow)
-
-globals = ["+","-","*", "/","display", "ccall"]
 
 --jopakita = return . Right . show
 
@@ -35,9 +35,12 @@ main = do
     input x $ \s -> do
         st <- runCompile initCompile $ 
                 do liftIO $ putStrLn "PREVED FROM COMPILER MONAD"
-                   k <- parseTop s >>= K.kNormalizeTop >>= A.alphaConvM 
+
+                   addEntry "display" $ TFun TFunSpec [TStr] TUnit
+
+                   k <- parseTop s >>= M.expand >>= K.kNormalizeTop >>= A.alphaConvM
                                    >>= B.betaReduceM >>= L.flattenM
-                   c1 <- C.convert k
+                   c1 <- C.convert k >>= E.eliminate
                    liftIO $ putStrLn $ prettyShow c1 
 
         reportStatus st

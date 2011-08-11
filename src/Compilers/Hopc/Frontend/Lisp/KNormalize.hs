@@ -66,7 +66,6 @@ knormSeq seq = do
 
           knormTail x = return x 
 
-
 kInitState :: KNormState
 kInitState = KNormState { tmpId = 0 }
 
@@ -129,12 +128,6 @@ knorm (ELet p1 p2 (AtomT (p21, bs)) eb p3 e p4) = do
     let tmpname = toString bs
     return $ KLet tmpname eb' e'
 
-knorm (EApply p1 (EAtom (AtomT (p12, "$$"))) args p2) = do
-    trace ("GOT DIRECTIVE $$ " ++ (show args)) $ return ()
-    return KUnit
---    let fn = toString bs
---    knormApp fn args
-
 knorm (EApply p1 (EAtom (AtomT (p12, bs))) args p2) = do
     let fn = toString bs
     knormApp fn args
@@ -164,5 +157,4 @@ knormApp fn a = do
             t   <- tmp "" "tmp"
             en  <- knorm e
             return $ (t, KLet t en)
-
 

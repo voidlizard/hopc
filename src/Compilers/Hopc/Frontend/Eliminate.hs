@@ -5,6 +5,7 @@ import qualified Data.Set as S
 import Data.Maybe
 import Data.Either
 import Control.Monad.State
+import Control.Monad.Trans
 import Data.Data
 import Data.Typeable
 import Data.Generics.PlateData
@@ -13,15 +14,16 @@ import Text.PrettyPrint.HughesPJClass
 import Text.Printf
 import Debug.Trace
 
+import Compilers.Hopc.Compile
 import Compilers.Hopc.Frontend.KTree
 import Compilers.Hopc.Frontend.Closure
 
 data Elim = Elim { elenv :: S.Set KId } 
-type ElimM = State Elim 
+type ElimM = StateT Elim CompileM
 
-eliminate :: Closure -> Closure
+eliminate :: Closure -> CompileM Closure
 eliminate k = trace "TRACE: eliminate" $
-    evalState (descendBiM tr k) init
+    evalStateT (descendBiM tr k) init
     where tr :: Closure -> ElimM Closure
 
           tr x@(CLet n e1 e2) = do
