@@ -15,6 +15,7 @@ import qualified Compilers.Hopc.Frontend.Closure as C
 import qualified Compilers.Hopc.Frontend.Eliminate as E
 import qualified Compilers.Hopc.Typing.Types as T
 import qualified Compilers.Hopc.Typing.Infer as I
+import qualified Compilers.Hopc.Compile as CC
 
 import qualified Compilers.Hopc.Frontend.KTyped as KT
 
@@ -30,15 +31,15 @@ main = do
     e <- withInput parseTop x
 --    print e
 --    error "stop"
-    let k = either (const $ error "Parse error") K.kNormalizeTop e
-    let k' = L.flatten $ B.betaReduce $ A.alphaConv k
-    let c = KT.constraints k'
-    putStrLn $ prettyShow k'
-    putStrLn " -- CONSTRAINTS -- "
-    forM_ c print
-    putStrLn " -- "
-    let k'' = E.eliminate $ C.convert globals k'
-    putStrLn $ prettyShow k''
+--    let k = either (const $ error "Parse error") K.kNormalizeTop e
+--    let k' = L.flatten $ B.betaReduce $ A.alphaConv k
+--    let c = KT.constraints k'
+--    putStrLn $ prettyShow k'
+--    putStrLn " -- CONSTRAINTS -- "
+--    forM_ c print
+--    putStrLn " -- "
+--    let k'' = E.eliminate $ C.convert globals k'
+--    putStrLn $ prettyShow k''
     error "done"
 
 withInput :: (BS.ByteString -> b) -> String -> IO b

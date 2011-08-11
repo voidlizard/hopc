@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, OverloadedStrings #-}
 
 module Compilers.Hopc.Frontend.Lisp.KNormalize where
 
@@ -9,6 +9,8 @@ import Control.Monad.State
 
 import Compilers.Hopc.Frontend.Lisp.BNFC.Lisp.Abs
 import Compilers.Hopc.Frontend.KTree
+
+import Debug.Trace
 
 toString :: BS.ByteString -> String
 toString = BS.unpack
@@ -122,6 +124,12 @@ knorm (ELet p1 p2 (AtomT (p21, bs)) eb p3 e p4) = do
     e'  <- knorm e
     let tmpname = toString bs
     return $ KLet tmpname eb' e'
+
+knorm (EApply p1 (EAtom (AtomT (p12, "$$"))) args p2) = do
+    trace ("GOT DIRECTIVE $$ " ++ (show args)) $ return ()
+    return KUnit
+--    let fn = toString bs
+--    knormApp fn args
 
 knorm (EApply p1 (EAtom (AtomT (p12, bs))) args p2) = do
     let fn = toString bs

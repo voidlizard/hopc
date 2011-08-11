@@ -4,15 +4,12 @@ module Compilers.Hopc.Frontend.Lisp.Parse (parseExpr, parseTop) where
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as C
 
+import Compilers.Hopc.Compile
 import Compilers.Hopc.Error
 import Compilers.Hopc.Frontend.Lisp.BNFC.Lisp.ErrM
 import Compilers.Hopc.Frontend.Lisp.BNFC.Lisp.Abs
 import Compilers.Hopc.Frontend.Lisp.BNFC.Lisp.Par
 import Compilers.Hopc.Frontend.KTree
-
-
---parseModule :: ByteString -> Either Error Module 
---parseModule = withError . pModule . myLexer
 
 parseExpr :: ByteString -> Either Error Exp
 parseExpr = withError . pExp . myLexer

@@ -28,3 +28,5 @@ position token O '(';
 position token C ')';
 position token QuoT '\'';
 
+comment ";"
+
