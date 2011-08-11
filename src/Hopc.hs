@@ -37,33 +37,10 @@ main = do
                 do liftIO $ putStrLn "PREVED FROM COMPILER MONAD"
                    k <- parseTop s >>= K.kNormalizeTop >>= A.alphaConvM 
                                    >>= B.betaReduceM >>= L.flattenM
-                   c1 <- C.convert [] k
---                   let k' = E.eliminate $ C.convert globals k
+                   c1 <- C.convert k
                    liftIO $ putStrLn $ prettyShow c1 
 
         reportStatus st
-    --            >>= K.kNorm 
-    --            e <- parseTop s -- >>= K.kNormalizeTop
-    --            k <- either (const $ error "Parse error") K.kNormalizeTop e
-    --            liftIO $ putStrLn $ prettyShow k
-    --            K.kNormalizeTop e
---        e <- withInput parseTop x
---        let k = either (const $ error "Parse error") K.kNormalizeTop e
---        liftIO $ putStrLn $ prettyShow k
---    print e
---    error "stop"
---    let k' = L.flatten $ B.betaReduce $ A.alphaConv k
---    let c = KT.constraints k'
---    putStrLn $ prettyShow k'
---    putStrLn " -- CONSTRAINTS -- "
---    forM_ c print
---    putStrLn " -- "
---    let k'' = E.eliminate $ C.convert globals k'
---    putStrLn $ prettyShow k''
-
---withInput :: String -> (BS.ByteString -> m b) -> String -> IO b
-
---withInput :: String -> (BS.ByteString -> b) -> IO b
 
     where input "-" fn = BS.hGetContents stdin >>= fn
           input x fn = BS.readFile x >>= fn

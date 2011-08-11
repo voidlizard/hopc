@@ -35,13 +35,13 @@ data Closure =  CInt Integer
              deriving (Show, Eq, Data, Typeable)
 
 
-data Conv = Conv { fns :: [(KId, Fun)], glob :: S.Set KId } deriving (Show)
+data Conv = Conv { fns :: [(KId, Fun)] } deriving (Show)
 
 type ConvM = StateT Conv CompileM
 
-convert :: [KId] -> KTree -> CompileM Closure
-convert g k = do
-    (cls, s) <- runStateT (conv k) (convInit g)
+convert :: KTree -> CompileM Closure
+convert k = do
+    (cls, s) <- runStateT (conv k) convInit
     let binds = bindsOfCls cls
     return $ convDirectCls $ CLetR (map bindsOfFn (fns s) ++ binds) (cOfCls cls)
     where bindsOfCls (CLet n e1 e2) = [(n, e1)]
@@ -112,7 +112,7 @@ convert g k = do
               e' <- conv e
               return $ (n, e')
 
-          convInit g = Conv [] (S.fromList g)
+          convInit = Conv []
 
 data ConvDir = ConvDir { efuncs :: (M.Map KId Fun), ebinds :: (M.Map KId (KId, [KId])), evars :: S.Set KId } deriving (Show)
 type ConvDirM = State ConvDir 
@@ -196,12 +196,13 @@ convDirectCls k = evalState (descendBiM tr k) init
 
 
 gs :: ConvM (S.Set KId)
-gs = gets glob 
+gs = return $ S.empty
 
 hasFree (Fun _ _ free _) = free /= []
 
 isGlobal :: KId -> ConvM Bool
-isGlobal n = gs >>= (return . S.member n)
+--isGlobal n = gs >>= (return . S.member n)
+isGlobal n = return $ False -- TODO: use CompileM monad to check globals 
 
 addFun :: KId -> [KId] -> [KId] -> Closure -> ConvM ()
 addFun n args free bdy = do
