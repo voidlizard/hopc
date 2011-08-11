@@ -1,6 +1,7 @@
 module Compilers.Hopc.Frontend.BetaReduction where
 
 import Compilers.Hopc.Frontend.KTree
+import Compilers.Hopc.Compile
 
 import Debug.Trace
 
@@ -10,6 +11,9 @@ import Control.Monad.State
 import Data.Generics.Biplate
 
 type BStateM = State (M.Map KId KId)
+
+betaReduceM :: KTree -> CompileM KTree
+betaReduceM = return . betaReduce
 
 betaReduce :: KTree -> KTree
 betaReduce k = evalState (descendBiM tr k) M.empty

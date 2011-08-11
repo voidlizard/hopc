@@ -15,7 +15,7 @@ data AlphaConv = AlphaConv { aId :: Int, aEnv :: M.Map KId KId } deriving Show
 type AlphaConvM = State AlphaConv
 
 alphaConvM :: KTree -> CompileM KTree
-alphaConvM = return
+alphaConvM = return . alphaConv
 
 alphaConv :: KTree -> KTree
 alphaConv k = evalState (descendBiM tr k) aInitState

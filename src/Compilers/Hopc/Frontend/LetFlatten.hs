@@ -4,12 +4,16 @@ import Data.Generics.Biplate
 import Control.Monad.State
 
 import Compilers.Hopc.Frontend.KTree
+import Compilers.Hopc.Compile
 
 {-
 
 (let (x (let (y e1) e2)) e3) => (let (y e1) (let (x e2) e3))
 
 -}
+
+flattenM :: KTree -> CompileM KTree
+flattenM = return . flatten
 
 flatten :: KTree -> KTree
 flatten k = rewriteBi tr k

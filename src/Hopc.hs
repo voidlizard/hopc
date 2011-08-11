@@ -35,7 +35,10 @@ main = do
     input x $ \s -> do
         st <- runCompile initCompile $ 
                 do liftIO $ putStrLn "PREVED FROM COMPILER MONAD"
-                   k <- parseTop s >>= K.kNormalizeTop >>= A.alphaConvM >>= B.betaReduce
+                   k <- parseTop s >>= K.kNormalizeTop >>= A.alphaConvM 
+                                   >>= B.betaReduceM >>= L.flattenM
+                   c1 <- C.convert k
+--                   let k' = E.eliminate $ C.convert globals k
                    liftIO $ putStrLn $ prettyShow k
 
         reportStatus st
