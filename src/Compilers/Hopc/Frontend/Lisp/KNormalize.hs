@@ -7,6 +7,7 @@ import Text.Printf
 
 import Control.Monad.State
 
+import Compilers.Hopc.Compile
 import Compilers.Hopc.Frontend.Lisp.BNFC.Lisp.Abs
 import Compilers.Hopc.Frontend.KTree
 

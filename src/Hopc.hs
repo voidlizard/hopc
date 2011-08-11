@@ -29,9 +29,9 @@ globals = ["+","-","*", "/","display", "ccall"]
 main = do
     (x:_) <- getArgs
     e <- withInput parseTop x
+    let k = either (const $ error "Parse error") K.kNormalizeTop e
 --    print e
 --    error "stop"
---    let k = either (const $ error "Parse error") K.kNormalizeTop e
 --    let k' = L.flatten $ B.betaReduce $ A.alphaConv k
 --    let c = KT.constraints k'
 --    putStrLn $ prettyShow k'
