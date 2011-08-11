@@ -13,6 +13,8 @@ import qualified Compilers.Hopc.Frontend.BetaReduction as B
 import qualified Compilers.Hopc.Frontend.LetFlatten as L
 import qualified Compilers.Hopc.Frontend.Closure as C
 import qualified Compilers.Hopc.Frontend.Eliminate as E
+import qualified Compilers.Hopc.Typing.Types as T
+import qualified Compilers.Hopc.Typing.Infer as I
 --import Compilers.Hopc.Backend.DumbC
 import Debug.Trace
 

@@ -78,7 +78,7 @@ convert g k =
               g <- isGlobal n
               fs <- gets fns
               let fn = lookup n fs
-              let nofree = not $ if isJust fn then hasFree (fromJust fn) else False --False -- error $ "call of unknown function: " ++ fn --False
+              let nofree = not $ if isJust fn then hasFree (fromJust fn) else True --False -- error $ "call of unknown function: " ++ fn --False
               let fn = if g then n else (fname n)
               return $ if g || nofree then CApplDir fn args else CApplCls n args
 
@@ -225,7 +225,7 @@ instance Pretty Closure where
     pPrintPrec l p (CApplDir n a) = prettyParen True $ text "apply-direct" <+> text n <+> ( fsep $ map text a )
     pPrintPrec l p (CMakeCls s f) = prettyParen True $ text "make-closure" <+> text s <+> ( fsep $ map text f )
     pPrintPrec l p (CLet i e1 e2) = prettyParen True $ text "let"
-                                    <+> (prettyParen True $ text i <+> pPrintPrec l p e1)
+                                    <+> prettyParen True (prettyParen True $ text i <+> pPrintPrec l p e1)
                                     $$ nest 2 (pPrintPrec l p e2)
     pPrintPrec l p (CLetR binds e) = prettyParen True $ text "letrec"
                                      <+> prettyParen True ( fsep $ map (\(n, e1) -> prettyParen True (text n <+> pPrintPrec l p e1)) binds )
