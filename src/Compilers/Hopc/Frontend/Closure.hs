@@ -87,7 +87,7 @@ convert k = do
               globs <- gs
               let (l, r) = partitionEithers $ para fn eb
 
-              trace ("TRACE: para " ++ n ++ " " ++ " " ++ (show l) ++ (show r)) $ return () 
+--              trace ("TRACE: para " ++ n ++ " " ++ " " ++ (show l) ++ (show r)) $ return () 
 
               let fset = S.difference (S.fromList r) (S.fromList (n : l ++ argz) `S.union` globs)
               let rset = S.fromList r

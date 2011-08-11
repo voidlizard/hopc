@@ -11,6 +11,7 @@ import Compilers.Hopc.Frontend.KTree
 import qualified Compilers.Hopc.Frontend.Lisp.KNormalize as K
 import qualified Compilers.Hopc.Frontend.AlphaConv as A
 import qualified Compilers.Hopc.Frontend.BetaReduction as B
+import qualified Compilers.Hopc.Frontend.Const as Cn
 import qualified Compilers.Hopc.Frontend.LetFlatten as L
 import qualified Compilers.Hopc.Frontend.Closure as C
 import qualified Compilers.Hopc.Frontend.Eliminate as E
@@ -35,8 +36,11 @@ main = do
         st <- runCompile initCompile $ 
                 do liftIO $ putStrLn "PREVED FROM COMPILER MONAD"
 
-                   k <- parseTop s >>= K.kNormalizeTop >>= A.alphaConvM
-                                   >>= B.betaReduceM >>= L.flattenM
+                   k <- parseTop s >>= K.kNormalizeTop >>= A.alphaConvM 
+                                   >>= Cn.propagate
+                                   >>= B.betaReduceM
+                                   >>= L.flattenM
+
                    c1 <- C.convert k >>= E.eliminate
                    liftIO $ putStrLn $ prettyShow c1 
 

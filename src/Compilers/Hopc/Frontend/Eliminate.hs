@@ -46,6 +46,7 @@ eliminate k = trace "TRACE: eliminate" $
           tr x = return x
 
           trB (n, e)  = do
+            trace ("TRACE: elim " ++ n) $ return ()
             e' <- tr e
             return (n, e')
 
@@ -76,6 +77,8 @@ effect k = foldl (||) False $ para eff k
     where eff (CVar n) r = False : concat r
           eff (CMakeCls n args) r = False : concat r
           eff (CFun (Fun n _ _ e)) r = False : concat r
+          eff (CInt _) r = False : concat r
+          eff (CStr _) r = False : concat r
           eff CUnit r = False : concat r
           eff x r = True : concat r
 
