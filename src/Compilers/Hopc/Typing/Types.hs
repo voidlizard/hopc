@@ -11,3 +11,9 @@ class TType a where
     merge     :: a -> a -> Maybe [(a,a)]
     typeid    :: a -> TypeId
 
+occursList :: (TType a) => TypeId -> [a] -> Bool
+occursList tx xs = foldl (||) False $ map (\x -> occurs tx x) xs
+
+substList :: (TType a) => TypeId -> a -> [a] -> [a]
+substList tx a = map (subst tx a)
+

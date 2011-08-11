@@ -41,7 +41,6 @@ uni (Right ((a,b):rs)) | a == b = uni $ Right rs
                        | otherwise = case merge a b of
                                         Nothing  -> Left $ NotMatch a b
                                         (Just l) -> uni $ Right $ l ++ rs
-                       -- uni $ Right $ zip (types a) (types b) ++ rs
 
 uni (Left x) = Left x
 
@@ -49,5 +48,4 @@ sub ta b (x, y) = (subst ta b x, subst ta b y)
 
 result (a, b) (Left x)  = Left x
 result (a, b) (Right x) = Right $ x ++ [(a, b)]
-
 
