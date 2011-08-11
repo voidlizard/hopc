@@ -22,7 +22,7 @@ terminator Def "";
 terminator AtomT "";
 terminator Bind "";
 
-position token AtomT (["!$%&|*+-/:<=>?@^_~#"]|letter (["!$%&|*+-/:<=>?@^_~#"]|letter|digit)* );
+position token AtomT ((["!$%&|*+-/:<=>?@^_~#"]|letter)(["!$%&|*+-/:<=>?@^_~#"]|letter|digit)* );
 
 position token O '(';
 position token C ')';

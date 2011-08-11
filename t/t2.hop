@@ -1,3 +1,2 @@
-
-(def main () 42)
-
+(define (display s) (out-string s) (out-char 13))
+(define hello (display "hello world"))

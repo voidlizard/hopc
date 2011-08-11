@@ -15,12 +15,15 @@ import qualified Compilers.Hopc.Frontend.Closure as C
 import qualified Compilers.Hopc.Frontend.Eliminate as E
 import qualified Compilers.Hopc.Typing.Types as T
 import qualified Compilers.Hopc.Typing.Infer as I
+
+import qualified Compilers.Hopc.Frontend.KTyped as KT
+
 --import Compilers.Hopc.Backend.DumbC
 import Debug.Trace
 
 import Text.PrettyPrint.HughesPJClass (prettyShow)
 
-globals = ["+","-","*", "/","display"]
+globals = ["+","-","*", "/","display", "ccall"]
 
 main = do
     (x:_) <- getArgs
@@ -29,12 +32,12 @@ main = do
 --    error "stop"
     let k = either (const $ error "Parse error") K.kNormalizeTop e
     let k' = L.flatten $ B.betaReduce $ A.alphaConv k
+    let c = KT.constraints k'
     putStrLn $ prettyShow k'
-    putStrLn ""
+    putStrLn " -- CONSTRAINTS -- "
+    forM_ c print
+    putStrLn " -- "
     let k'' = E.eliminate $ C.convert globals k'
---    let k'' = C.convert globals k'
---    let k' = L.flatten $ B.betaReduce $ A.alphaConv k
---    let k' = B.betaReduce $ A.alphaConv k --k --L.flatten $ B.betaReduce $ A.alphaConv k
     putStrLn $ prettyShow k''
     error "done"
 
