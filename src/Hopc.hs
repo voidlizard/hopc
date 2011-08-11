@@ -8,7 +8,6 @@ import Data.Either
 import Control.Monad.Error
 import Compilers.Hopc.Frontend.Lisp.Parse
 import Compilers.Hopc.Frontend.KTree
-import qualified Compilers.Hopc.Frontend.Lisp.Macro  as M
 import qualified Compilers.Hopc.Frontend.Lisp.KNormalize as K
 import qualified Compilers.Hopc.Frontend.AlphaConv as A
 import qualified Compilers.Hopc.Frontend.BetaReduction as B
@@ -36,9 +35,7 @@ main = do
         st <- runCompile initCompile $ 
                 do liftIO $ putStrLn "PREVED FROM COMPILER MONAD"
 
-                   addEntry "display" $ TFun TFunSpec [TStr] TUnit
-
-                   k <- parseTop s >>= M.expand >>= K.kNormalizeTop >>= A.alphaConvM
+                   k <- parseTop s >>= K.kNormalizeTop >>= A.alphaConvM
                                    >>= B.betaReduceM >>= L.flattenM
                    c1 <- C.convert k >>= E.eliminate
                    liftIO $ putStrLn $ prettyShow c1 

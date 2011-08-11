@@ -11,6 +11,7 @@ import Control.Monad.Trans
 
 import Compilers.Hopc.Compile
 import Compilers.Hopc.Error
+import Compilers.Hopc.Frontend.Lisp.MacroExpand as M
 import Compilers.Hopc.Frontend.Lisp.BNFC.Lisp.Abs
 import Compilers.Hopc.Frontend.KTree
 
@@ -106,6 +107,10 @@ knorm (EInt i) = return $ KInt i
 knorm (EStr s) = return $ KStr s
 
 knorm (EAtom (AtomT (p,bs))) = return $ KVar (toString bs)
+
+knorm m@(EMacro1 o e c) = do
+    e' <- lift $ M.expand m
+    knorm e'
 
 --knorm (EList _ _ _ _) = error "List literals are not supported yet"
 

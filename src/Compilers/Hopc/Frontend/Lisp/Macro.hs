@@ -13,9 +13,9 @@ import Control.Monad
 import Debug.Trace
 
 expand :: TopLevel -> CompileM TopLevel 
-expand (TopLevel e) = do
-    e' <- mapM exp e
-    return $ TopLevel e'
+expand x@(TopLevel e) = return x
+--    e' <- mapM exp e
+--    return $ TopLevel e'
 
 exp (ELet a b c e1 d e2 f) = do
     e1' <- exp e1
