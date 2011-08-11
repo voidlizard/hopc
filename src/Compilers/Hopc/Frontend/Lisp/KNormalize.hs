@@ -2,25 +2,31 @@
 
 module Compilers.Hopc.Frontend.Lisp.KNormalize where
 
+import Compilers.Hopc.Compile
 import qualified Data.ByteString.Char8 as BS
 import Text.Printf
 
 import Control.Monad.State
+import Control.Monad.Trans
 
 import Compilers.Hopc.Compile
+import Compilers.Hopc.Error
 import Compilers.Hopc.Frontend.Lisp.BNFC.Lisp.Abs
 import Compilers.Hopc.Frontend.KTree
 
 import Debug.Trace
 
+data KNormState = KNormState { tmpId :: Int }
+type KNormStateM = StateT KNormState CompileM --KNormState -- (CompileM KNormState)
+
 toString :: BS.ByteString -> String
 toString = BS.unpack
 
-kNormalizeExp :: Exp -> KTree
-kNormalizeExp e = evalState (knorm e) kInitState
+kNormalizeExp :: Exp -> CompileM KTree
+kNormalizeExp e = evalStateT (knorm e) kInitState
 
-kNormalizeTop :: TopLevel -> KTree
-kNormalizeTop (TopLevel c) = flip evalState kInitState (knormSeq c)
+kNormalizeTop :: TopLevel -> CompileM KTree
+kNormalizeTop (TopLevel c) = flip evalStateT kInitState (knormSeq c)
 
 knormTop :: Exp -> KNormStateM (KId, KTree)
 
@@ -60,9 +66,6 @@ knormSeq seq = do
 
           knormTail x = return x 
 
-data KNormState = KNormState { tmpId :: Int }
-
-type KNormStateM = State KNormState
 
 kInitState :: KNormState
 kInitState = KNormState { tmpId = 0 }

@@ -6,11 +6,16 @@ import Control.Monad.State
 import Data.Maybe
 import Data.Generics.Biplate
 
+import Compilers.Hopc.Compile
+import Compilers.Hopc.Error
 import Compilers.Hopc.Frontend.KTree
 
 data AlphaConv = AlphaConv { aId :: Int, aEnv :: M.Map KId KId } deriving Show
 
 type AlphaConvM = State AlphaConv
+
+alphaConvM :: KTree -> CompileM KTree
+alphaConvM = return
 
 alphaConv :: KTree -> KTree
 alphaConv k = evalState (descendBiM tr k) aInitState
