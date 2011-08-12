@@ -115,6 +115,8 @@ convert k = do
                 eb'' <- conv eb
                 addFun n argz free eb''
 
+              clrbind
+
               trace (printf "convBind KLambda %s (%s) free %s" n (show argz) (show free)) $ do
                   return $ (n, CMakeCls (fname n) free)
 
