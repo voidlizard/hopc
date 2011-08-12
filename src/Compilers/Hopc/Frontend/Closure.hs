@@ -106,8 +106,9 @@ convert k = do
 
               eb' <- conv eb
               
-              let live = concat $ [ n:ns | CApplCls n ns <- universe eb' ] ++ [ [n] | CVar n <- universe eb'] ++ [ ns | CMakeCls _ ns <- universe eb']
-              let free = filter (flip elem live) $ filter (flip S.member fset) r
+              let live = S.fromList $ concat $ [ n:ns | CApplCls n ns <- universe eb' ] ++ [ [n] | CVar n <- universe eb'] ++ [ ns | CMakeCls _ ns <- universe eb']
+              let free = S.toList $ S.intersection live fset
+              -- filter (flip elem live) $ filter (flip S.member fset) r
 
               addFun n argz free eb'
 

@@ -1,13 +1,36 @@
 
-BUG:
+FIXME:
+===================================================================================================
+dmz@x201:~/prj/hop$ cat  t/sloop3.hop 
 
-(define a 22)
-(define a 33)
-(define a 12)
-(define a 66)
+($ ccall "display" :string :unit $)
+($ ccall "sleep"   :int :unit $)
 
+(define (pysh) (display "PYSH-PYSH"))
 
-dmz@x201:~/prj/hop$ cat ./td9.hop | ./hopc -
-(letrec ((a_0 22) (a_1 33) (a_2 12))
-   66)
+(define (main)
+    (display "PREVED")
+    (pysh)
+    (sleep 1)
+    (pysh)
+    (let (q pysh) (q))
+    (pysh)
+)
 
+(main)
+
+(letrec ((fun_pysh_2 (func () (let ((_tmp3_4 "PYSH-PYSH"))
+                                 (apply-direct display _tmp3_4))))
+         (fun_main_3 (func (pysh_2) (letrec ((_tmp4_5 (let ((_tmp5_10 "PREVED")) ;; FIXME: REMOVE UNNESESSARY FREE VAR AFTER CALL CONV
+                                                         (apply-direct display _tmp5_10)))
+                                             (_tmp6_6 (apply-direct fun_pysh_2))
+                                             (_tmp7_7 (let ((_tmp8_11 1))
+                                                         (apply-direct sleep _tmp8_11)))
+                                             (_tmp9_8 (apply-direct fun_pysh_2))
+                                             (_tmp10_9 (apply-direct fun_pysh_2)))
+                                       (apply-direct fun_pysh_2))))
+         (pysh_2 (make-closure fun_pysh_2))
+         (main_3 (make-closure fun_main_3 pysh_2)))
+   (apply-closure main_3))
+
+===================================================================================================
