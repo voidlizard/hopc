@@ -35,7 +35,7 @@ data Closure =  CInt Integer
              deriving (Show, Eq, Data, Typeable)
 
 
-data Conv = Conv { fns :: [(KId, Fun)] } deriving (Show)
+data Conv = Conv { fns :: [(KId, Fun)], cbind :: Maybe KId } deriving (Show)
 
 type ConvM = StateT Conv CompileM
 
@@ -76,18 +76,25 @@ convert k = do
           conv (KApp n args) = do
               g <- isGlobal n
               fs <- gets fns
-              let fn = lookup n fs
  
-              trace (printf "TRACE: KApp %s %s --- has entry %s" n (show args) (show fn)) $ return ()
+              mb <- getbind
+
+              let fn = lookup n fs
+
+              trace (printf "TRACE: KApp %s %s --- has entry %s (bind: %s)" n (show args) (show fn) (show mb)) $ return ()
 
               let nofree = not $ if isJust fn then hasFree (fromJust fn) else True --False -- error $ "call of unknown function: " ++ fn --False
+              let self = maybe False (== n) mb
+              let free = maybe [] getFree fn
               let fn = if g then n else (fname n)
-              return $ if g || nofree then CApplDir fn args else CApplCls n args
+              return $ if g || nofree || self then CApplDir fn (args++free) else CApplCls n args
 
           conv wtf = error $ "WTF? " ++ show wtf
 
           convBind (n, e@(KLambda argz eb)) = trace (printf "TRACE: convBind %s" n) $ do
+              setbind n
               globs <- gs
+
               let (l, r) = partitionEithers $ para fn eb
 
 --              trace ("TRACE: para " ++ n ++ " " ++ " " ++ (show l) ++ (show r)) $ return () 
@@ -104,9 +111,9 @@ convert k = do
 
               addFun n argz free eb'
 
---              when (free /= []) $ do --- FIXME: real perversion: correct function body
---                eb'' <- conv eb
---                addFun n argz free eb''
+              when (free /= []) $ do --- FIXME: real perversion: correct function body
+                eb'' <- conv eb
+                addFun n argz free eb''
 
               trace (printf "convBind KLambda %s (%s) free %s" n (show argz) (show free)) $ do
                   return $ (n, CMakeCls (fname n) free)
@@ -122,7 +129,16 @@ convert k = do
               e' <- conv e
               return $ (n, e')
 
-          convInit = Conv []
+          convInit = Conv [] Nothing
+
+          clrbind :: ConvM ()
+          clrbind = modify (\s -> s { cbind = Nothing })
+
+          setbind :: KId -> ConvM ()
+          setbind n = modify (\s -> s { cbind = Just n})
+
+          getbind :: ConvM (Maybe KId)
+          getbind = gets (cbind)
 
 data ConvDir = ConvDir { efuncs :: (M.Map KId Fun), ebinds :: (M.Map KId (KId, [KId])), evars :: S.Set KId } deriving (Show)
 type ConvDirM = State ConvDir 
@@ -209,6 +225,7 @@ gs :: ConvM (S.Set KId)
 gs = lift names
 
 hasFree (Fun _ _ free _) = free /= []
+getFree (Fun _ _ free _) = free
 
 isGlobal :: KId -> ConvM Bool
 isGlobal n = gs >>= (return . S.member n)
