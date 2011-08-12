@@ -82,7 +82,7 @@ convert k = do
 
               let fn = lookup n fs
 
-              trace (printf "TRACE: KApp %s %s --- has entry %s (bind: %s)" n (show args) (show fn) (show mb)) $ return ()
+--              trace (printf "TRACE: KApp %s %s --- has entry %s (bind: %s)" n (show args) (show fn) (show mb)) $ return ()
 
               let nofree = not $ if isJust fn then hasFree (fromJust fn) else True --False -- error $ "call of unknown function: " ++ fn --False
               let self = maybe False (== n) mb
@@ -98,30 +98,24 @@ convert k = do
 
               let (l, r) = partitionEithers $ para fn eb
 
---              trace ("TRACE: para " ++ n ++ " " ++ " " ++ (show l) ++ (show r)) $ return () 
-
               let fset = S.difference (S.fromList r) (S.fromList (n : l ++ argz) `S.union` globs)
               let rset = S.fromList r
              
               addFun n argz [] (CUnit) -- FIXME: function's dummy. what a perversion...
 
-              eb' <- conv eb -- >>= eliminate
+              eb'  <- conv eb >>= lift . eliminate
 
               let fv c  = do
                   let live = S.fromList $ concat $ [ n:ns | CApplCls n ns <- universe c ] ++ [ [n] | CVar n <- universe c] ++ [ ns | CMakeCls _ ns <- universe c]
-                  trace ("TRACE LIVE/FSET : " ++ n ++ " " ++ (show live) ++ (show fset)) $ return ()
                   return $ S.toList $ S.intersection live fset
              
               free <- fv eb'
-                
-              trace ("TRACE: convBind STEP 1 " ++ n ++ " "  ++ (show free)) $ return ()
 
               addFun n argz free eb'
 
               when (free /= []) $ do --- FIXME: real perversion: fix function body
-                eb'' <- conv eb -- >>= eliminate
+                eb'' <- conv eb >>= lift . eliminate
                 free <- fv eb''
-                trace ("TRACE: convBind STEP 2 " ++ n ++ " "  ++ (show free)) $ return ()
                 addFun n argz free eb''
 
               clrbind
@@ -269,4 +263,69 @@ instance Pretty Closure where
     pPrintPrec l p (CLetR binds e) = prettyParen True $ text "letrec"
                                      <+> prettyParen True ( fsep $ map (\(n, e1) -> prettyParen True (text n <+> pPrintPrec l p e1)) binds )
                                      $$ nest 2 (pPrintPrec l p e)
+
+
+data Elim = Elim { elenv :: S.Set KId } 
+type ElimM = StateT Elim CompileM
+
+eliminate :: Closure -> CompileM Closure
+eliminate k = trace "TRACE: eliminate" $
+    evalStateT (descendBiM tr k) init
+    where tr :: Closure -> ElimM Closure
+
+          tr x@(CLet n e1 e2) = do
+            e1' <- tr e1
+            e2' <- tr e2
+            let live = S.fromList $ usage e2
+            if S.member n live || effect e1'
+                then return $ CLet n e1' e2'
+                else return e2'
+
+          tr x@(CLetR binds e) = do
+            e'     <- tr e
+            binds' <- elim e [] (reverse binds) --mapM trB binds
+            return $ CLetR binds' e'
+
+          tr (CFun (Fun fn args free e)) = do
+            e' <- tr e
+            return $ CFun (Fun fn args free e')
+
+          tr x = return x
+
+          trB (n, e)  = do
+            e' <- tr e
+            return (n, e')
+
+          flt live (n, (CFun _)) = S.member n live
+          flt live (n, e) = S.member n live || effect e
+
+          usage x = para u x
+          u (CApplCls n args) r = concat r ++ n:args
+          u (CApplDir n args) r = concat r ++ n:args
+          u (CVar n) r = concat r ++ [n]
+          u (CMakeCls n args) r = concat r ++ n:args
+          u x r = concat r
+
+          init = Elim S.empty
+
+          elim e l (r:rs) = do
+            let ebs = e : map snd l
+            let live = S.fromList $ concat $ map usage ebs
+            r' <- trB r
+            if flt live r'
+              then elim e (r':l) rs
+              else elim e l rs
+
+          elim e l [] = return l
+
+effect :: Closure -> Bool
+effect k = foldl (||) False $ para eff k
+    where eff (CVar n) r = False : concat r
+          eff (CMakeCls n args) r = False : concat r
+          eff (CFun (Fun n _ _ e)) r = False : concat r
+          eff (CInt _) r = False : concat r
+          eff (CStr _) r = False : concat r
+          eff CUnit r = False : concat r
+          eff x r = True : concat r
+
 
