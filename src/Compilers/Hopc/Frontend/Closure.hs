@@ -19,6 +19,7 @@ import Debug.Trace
 
 import Compilers.Hopc.Compile
 import Compilers.Hopc.Frontend.KTree
+--import qualified Compilers.Hopc.Frontend.Eliminate as E
 
 data Fun = Fun KId [KId] [KId] Closure deriving (Show, Eq, Data, Typeable)
 
@@ -104,16 +105,23 @@ convert k = do
              
               addFun n argz [] (CUnit) -- FIXME: function's dummy. what a perversion...
 
-              eb' <- conv eb
-              
-              let live = S.fromList $ concat $ [ n:ns | CApplCls n ns <- universe eb' ] ++ [ [n] | CVar n <- universe eb'] ++ [ ns | CMakeCls _ ns <- universe eb']
-              let free = S.toList $ S.intersection live fset
-              -- filter (flip elem live) $ filter (flip S.member fset) r
+              eb' <- conv eb -- >>= eliminate
+
+              let fv c  = do
+                  let live = S.fromList $ concat $ [ n:ns | CApplCls n ns <- universe c ] ++ [ [n] | CVar n <- universe c] ++ [ ns | CMakeCls _ ns <- universe c]
+                  trace ("TRACE LIVE/FSET : " ++ n ++ " " ++ (show live) ++ (show fset)) $ return ()
+                  return $ S.toList $ S.intersection live fset
+             
+              free <- fv eb'
+                
+              trace ("TRACE: convBind STEP 1 " ++ n ++ " "  ++ (show free)) $ return ()
 
               addFun n argz free eb'
 
-              when (free /= []) $ do --- FIXME: real perversion: correct function body
-                eb'' <- conv eb
+              when (free /= []) $ do --- FIXME: real perversion: fix function body
+                eb'' <- conv eb -- >>= eliminate
+                free <- fv eb''
+                trace ("TRACE: convBind STEP 2 " ++ n ++ " "  ++ (show free)) $ return ()
                 addFun n argz free eb''
 
               clrbind

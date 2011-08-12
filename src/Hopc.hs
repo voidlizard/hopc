@@ -37,7 +37,7 @@ main = do
                    k <- parseTop s >>= K.kNormalizeTop >>= dump 
                                    >>= A.alphaConvM    >>= dump 
                                    >>= Cn.propagate
-                                   >>= B.betaReduceM
+                                   >>= B.betaReduceM >>= dump 
                                    >>= L.flattenM
 
                    c1 <- C.convert k >>= E.eliminate
