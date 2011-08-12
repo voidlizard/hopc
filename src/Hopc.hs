@@ -28,15 +28,14 @@ import Debug.Trace
 
 import Text.PrettyPrint.HughesPJClass (prettyShow)
 
---jopakita = return . Right . show
-
 main = do
     (x:_) <- getArgs
     input x $ \s -> do
         st <- runCompile initCompile $ 
                 do liftIO $ putStrLn "PREVED FROM COMPILER MONAD"
 
-                   k <- parseTop s >>= K.kNormalizeTop >>= A.alphaConvM 
+                   k <- parseTop s >>= K.kNormalizeTop >>= dump 
+                                   >>= A.alphaConvM    >>= dump 
                                    >>= Cn.propagate
                                    >>= B.betaReduceM
                                    >>= L.flattenM
@@ -48,6 +47,9 @@ main = do
 
     where input "-" fn = BS.hGetContents stdin >>= fn
           input x fn = BS.readFile x >>= fn
+
+
+dump x = liftIO $ putStrLn (prettyShow x) >> return x
 
 reportStatus (Left x)  = print x
 reportStatus (Right x) = error "finished?"

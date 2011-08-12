@@ -153,6 +153,8 @@ knorm (EDef (DefExp _ (AtomT (p,bs)) e _)) = do
     e' <- knorm e
     return e'
 
+knorm (EBegin o exps c) = knormSeq exps
+
 knorm x = error $ "wtf? " ++ show x
 
 knormApp fn a = do

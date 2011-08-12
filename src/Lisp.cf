@@ -10,6 +10,7 @@ ELet.    Exp ::= O "let" O AtomT Exp C Exp C;
 ELetM.   Exp ::= O "let" O [Bind] C Exp C ;
 ELambda. Exp ::= O "lambda" O [AtomT] C Exp C;
 EApply.  Exp ::= O Exp [Exp] C;
+EBegin.  Exp ::= O "begin" [Exp] C;
 EMacro1. Exp ::= O "$" [Exp] "$" C;
 
 EBind.   Bind ::= O AtomT Exp C;

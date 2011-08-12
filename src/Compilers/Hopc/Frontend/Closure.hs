@@ -77,6 +77,9 @@ convert k = do
               g <- isGlobal n
               fs <- gets fns
               let fn = lookup n fs
+ 
+              trace (printf "TRACE: KApp %s %s --- has entry %s" n (show args) (show fn)) $ return ()
+
               let nofree = not $ if isJust fn then hasFree (fromJust fn) else True --False -- error $ "call of unknown function: " ++ fn --False
               let fn = if g then n else (fname n)
               return $ if g || nofree then CApplDir fn args else CApplCls n args
@@ -91,13 +94,20 @@ convert k = do
 
               let fset = S.difference (S.fromList r) (S.fromList (n : l ++ argz) `S.union` globs)
               let rset = S.fromList r
-              
+             
+              addFun n argz [] (CUnit) -- FIXME: function's dummy. what a perversion...
+
               eb' <- conv eb
               
               let live = concat $ [ n:ns | CApplCls n ns <- universe eb' ] ++ [ [n] | CVar n <- universe eb'] ++ [ ns | CMakeCls _ ns <- universe eb']
               let free = filter (flip elem live) $ filter (flip S.member fset) r
 
               addFun n argz free eb'
+
+--              when (free /= []) $ do --- FIXME: real perversion: correct function body
+--                eb'' <- conv eb
+--                addFun n argz free eb''
+
               trace (printf "convBind KLambda %s (%s) free %s" n (show argz) (show free)) $ do
                   return $ (n, CMakeCls (fname n) free)
 

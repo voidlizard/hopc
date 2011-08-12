@@ -46,7 +46,6 @@ eliminate k = trace "TRACE: eliminate" $
           tr x = return x
 
           trB (n, e)  = do
-            trace ("TRACE: elim " ++ n) $ return ()
             e' <- tr e
             return (n, e')
 
