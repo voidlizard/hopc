@@ -42,7 +42,7 @@ instance Pretty IR where
     pPrintPrec l p (IR op) = vcat $ map (pPrintPrec l p) op
 
 instance Pretty Instr where
-    pPrintPrec l p (I (LABEL l1) dsc) = text (l1++":") $$ nest 32 (text " ;" <+> text dsc)
+    pPrintPrec l p (I (LABEL l1) dsc) = text (l1++":") $$ nest 42 (text " ;" <+> text dsc)
     pPrintPrec l p (I op dsc)         = text "" $$ nest 10 ( pPrintPrec l p op $$ nest 32 (text " ;" <+> text dsc) )
 
 instance Pretty R where

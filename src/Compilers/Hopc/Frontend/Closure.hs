@@ -1,5 +1,6 @@
 {-# LANGUAGE EmptyDataDecls, DeriveDataTypeable #-}
-module Compilers.Hopc.Frontend.Closure where
+module Compilers.Hopc.Frontend.Closure (convert, Closure(..), Fun(..), eliminate)
+                                        where
 
 import qualified Data.Map as M
 import qualified Data.Set as S

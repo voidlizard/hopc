@@ -46,9 +46,11 @@ main = do
 
                    c1 <- C.convert k >>= E.eliminate
 
-                   ir <- FC.convert c1
 
                    liftIO $ putStrLn $ prettyShow c1 
+
+                   ir <- FC.convert c1
+
                    liftIO $ putStrLn "\n\nTinyC\n" 
                    liftIO $ putStrLn $ prettyShow ir
 
