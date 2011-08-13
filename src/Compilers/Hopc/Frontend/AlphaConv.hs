@@ -54,6 +54,12 @@ alphaConv k = evalState (descendBiM tr k) aInitState
             args' <- mapM getVar args
             return $ KApp fn' args'
 
+          tr (KCond t e1 e2) = do
+            t'   <- getVar t
+            e1' <- tr e1
+            e2' <- tr e2
+            return $ KCond t' e1' e2'
+
           tr x = return x
 
 aInitState = AlphaConv { aId = 0, aEnv = M.empty }

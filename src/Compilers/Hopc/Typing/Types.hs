@@ -12,7 +12,7 @@ class TType a where
     typeid    :: a -> TypeId
 
 occursList :: (TType a) => TypeId -> [a] -> Bool
-occursList tx xs = foldl (||) False $ map (\x -> occurs tx x) xs
+occursList tx xs = foldl (||) False $ map (occurs tx) xs
 
 substList :: (TType a) => TypeId -> a -> [a] -> [a]
 substList tx a = map (subst tx a)

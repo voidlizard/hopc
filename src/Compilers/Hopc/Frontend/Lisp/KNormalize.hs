@@ -155,6 +155,15 @@ knorm (EDef (DefExp _ (AtomT (p,bs)) e _)) = do
 
 knorm (EBegin o exps c) = knormSeq exps
 
+knorm (ECond o e e1 e2 c) = do
+    t   <- tmp "" "tmp"
+    t1  <- tmp "" "tmp"
+    t2  <- tmp "" "tmp"
+    e'  <- knorm e
+    e1' <- knorm e1
+    e2' <- knorm e2
+    return $ KLet t e' (KCond t (KLet t1 e1' (KVar t1)) (KLet t2 e2' (KVar t2)))
+
 knorm x = error $ "wtf? " ++ show x
 
 knormApp fn a = do

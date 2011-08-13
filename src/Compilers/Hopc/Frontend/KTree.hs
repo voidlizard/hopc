@@ -30,6 +30,7 @@ data KTree =   KUnit
              | KVar KId
              | KLambda [KId] KTree
              | KApp KId [KId]
+             | KCond KId KTree KTree
              deriving (Show, Eq, Data, Typeable)
 
 instance Pretty KTree where
@@ -47,4 +48,7 @@ instance Pretty KTree where
     pPrintPrec l p (KLambda args e) = prettyParen True $ text "lambda"
                                       <+> (prettyParen True (fsep $ map text args))
                                       <+> pPrintPrec l p e
+
+    pPrintPrec l p (KCond t e1 e2) = prettyParen True $ text "if" <+> text t
+                                     <+> pPrintPrec l p e1 <+> pPrintPrec l p e2
 

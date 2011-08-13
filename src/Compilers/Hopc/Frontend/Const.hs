@@ -34,6 +34,11 @@ propagate k = do
             e' <- tr e
             return $ KLambda args e'
 
+          tr (KCond t e1 e2) = do
+            e1' <- tr e1
+            e2' <- tr e2
+            return $ KCond t e1' e2'
+
           tr c@(KVar n) = do
             e <- repl c n
             return e

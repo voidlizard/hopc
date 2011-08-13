@@ -18,6 +18,9 @@ import qualified Compilers.Hopc.Frontend.Eliminate as E
 import qualified Compilers.Hopc.Typing.Types as T
 import qualified Compilers.Hopc.Typing.Infer as I
 
+import qualified Compilers.Hopc.Backend.TinyC.IR as IR
+import qualified Compilers.Hopc.Backend.TinyC.FromClosure as FC
+
 import Compilers.Hopc.Compile
 
 import qualified Compilers.Hopc.Frontend.KTyped as KT
@@ -41,6 +44,7 @@ main = do
                                    >>= L.flattenM
 
                    c1 <- C.convert k >>= E.eliminate
+                   tc <- FC.convert c1
                    liftIO $ putStrLn $ prettyShow c1 
 
         reportStatus st

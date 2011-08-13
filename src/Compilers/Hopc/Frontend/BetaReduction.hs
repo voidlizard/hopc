@@ -38,6 +38,12 @@ betaReduce k = evalState (descendBiM tr k) M.empty
             args' <- mapM getV args
             return $ KApp fn' args'
 
+          tr (KCond t e1 e2) = do
+            t'   <- getV t
+            e1' <- tr e1
+            e2' <- tr e2
+            return $ KCond t' e1' e2'
+
           tr (KLambda args e) = do
             let nm  = [(bn, n) | KLet bn (KVar n) _ <- universe e]
             let nm2 = concat [bs | KLetR bs _ <- universe e]

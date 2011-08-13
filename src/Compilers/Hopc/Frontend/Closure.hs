@@ -28,6 +28,7 @@ data Closure =  CInt Integer
               | CUnit
               | CLet  KId Closure Closure
               | CLetR [(KId, Closure)] Closure
+              | CCond KId Closure Closure
               | CVar KId
               | CFun Fun
               | CMakeCls KId [KId]
@@ -90,6 +91,11 @@ convert k = do
               let fn = if g then n else (fname n)
               return $ if g || nofree || self then CApplDir fn (args++free) else CApplCls n args
 
+          conv (KCond t e1 e2) = do
+            e1' <- conv e1
+            e2' <- conv e2
+            return $ CCond t e1' e2'
+
           conv wtf = error $ "WTF? " ++ show wtf
 
           convBind (n, e@(KLambda argz eb)) = trace (printf "TRACE: convBind %s" n) $ do
@@ -106,7 +112,7 @@ convert k = do
               eb'  <- conv eb >>= lift . eliminate
 
               let fv c  = do
-                  let live = S.fromList $ concat $ [ n:ns | CApplCls n ns <- universe c ] ++ [ [n] | CVar n <- universe c] ++ [ ns | CMakeCls _ ns <- universe c]
+                  let live = S.fromList $  para alive c
                   return $ S.toList $ S.intersection live fset
              
               free <- fv eb'
@@ -127,8 +133,15 @@ convert k = do
                     fn (KVar n )     r = concat r ++ [Right n]
                     fn (KApp n _)    r = concat r ++ [Right n]
                     fn (KLet n _ _)  r = concat r ++ [Left n]
+                    fn (KCond n _ _) r = concat r ++ [Right n]
                     fn (KLetR bs _)  r = concat r ++ map (Left . fst) bs
                     fn x r             = concat r
+
+                    alive (CVar n) r = n : concat r
+                    alive (CMakeCls n args) r = n:args ++ concat r
+                    alive (CApplCls n args) r = n:args ++ concat r
+                    alive (CCond n _ _) r = n : concat r
+                    alive x r = concat r
 
           convBind (n, e) = do
               e' <- conv e
@@ -263,6 +276,7 @@ instance Pretty Closure where
     pPrintPrec l p (CLetR binds e) = prettyParen True $ text "letrec"
                                      <+> prettyParen True ( fsep $ map (\(n, e1) -> prettyParen True (text n <+> pPrintPrec l p e1)) binds )
                                      $$ nest 2 (pPrintPrec l p e)
+    pPrintPrec l p (CCond c e1 e2) = prettyParen True $ text "if" <+> text c <+> (pPrintPrec l p e1) <+> (pPrintPrec l p e2)
 
 
 data Elim = Elim { elenv :: S.Set KId } 
@@ -304,6 +318,7 @@ eliminate k = trace "TRACE: eliminate" $
           u (CApplDir n args) r = concat r ++ n:args
           u (CVar n) r = concat r ++ [n]
           u (CMakeCls n args) r = concat r ++ n:args
+          u (CCond n _ _) r = concat r ++ [n]
           u x r = concat r
 
           init = Elim S.empty
@@ -325,6 +340,7 @@ effect k = foldl (||) False $ para eff k
           eff (CFun (Fun n _ _ e)) r = False : concat r
           eff (CInt _) r = False : concat r
           eff (CStr _) r = False : concat r
+          eff (CCond _ _ _) r = False : concat r
           eff CUnit r = False : concat r
           eff x r = True : concat r
 
