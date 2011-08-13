@@ -31,37 +31,50 @@ retvalReg = (R 1)
 convert  :: Closure -> CompileM IR
 convert k = trace "TRACE: FromClosure :: convert " $ do
     
-    v <- evalStateT (tr k) init
+    v <- evalStateT (tr retvalReg k) init
 
     return $ IR v
     
     where 
-          tr :: Closure -> ConvM [Instr]
+          tr :: R -> Closure -> ConvM [Instr]
 
-          tr (CLet n e e1) =  liftM2 (++) (trB (n,e)) (tr e1)   -- lift (++) (trB (n, e)) (tr e1)
+          tr r (CLet n e e1) = do
+            a <- trB (n,e)
+            b <- tr r e1
+            return $ a ++ b
 
-          tr (CLetR binds e)   = do
+          tr r (CLetR binds e)   = do
             binds' <- mapM trB binds
-            e' <- tr e
+            e' <- tr r e
             return $ concat binds' ++ e'
 
-          tr (CApplCls n args) = return $ [op $ CALL n ""]
-          tr (CApplDir n args) = return $ [op $ CALL n ""]
-          tr (CMakeCls n args) = return $ [opc NOP "make-closure"]
-          tr (CVar n)          = error "CVAR WTF?" -- [return $ opc (MOV (R 111) (R 222)) (printf "%s -> R0" n)] -- MOV Rn Rb
+          tr r (CApplCls n args) = do
+            rs <- mapM getReg' args >>= return . unwords . ((:) n) .  map (maybe "r?" prettyShow)
+            return $ [opc (CALL n "") rs] ++ [opc (MOV retvalReg r) "ret. val."]
+          
+          tr r (CApplDir n args) = do
+            rs <- mapM getReg' args >>= return . unwords . ((:) n) .  map (maybe "r?" prettyShow)
+            return $ [opc (CALL n "") rs] ++ [opc (MOV retvalReg r) (printf "retval -> %s" (prettyShow r))]
 
-          tr (CCond n e1 e2) = do
-            c1 <- tr e1
-            c2 <- tr e2
+          tr r (CMakeCls n args) = return $ [opc NOP "make-closure"]
+
+          tr r (CVar n)          = do
+            r2 <- getReg n
+            return $ [opc (MOV r2 r) (printf "%s -> %s" n (prettyShow r))]
+
+          tr r (CCond n e1 e2) = do
+            c1 <- tr r e1
+            c2 <- tr r e2
+            r  <- getReg n
 
             let l1 = "L1" -- FIXME: generate label
             let ll1 = LABEL l1
             let l3 = "L3"
             let ll3 = LABEL l3
 
-            return $ op (CJUMP (JumpFake (R 0)) l1) : c2 ++ op (JUMP "L3") : (op ll1) : c1 ++ op (LABEL "L3") : []
+            return $ op (CJUMP (JumpFake r) l1) : c2 ++ op (JUMP "L3") : (op ll1) : c1 ++ op (LABEL "L3") : []
 
-          tr x = return $ [opc NOP "unsupported"]
+          tr r x = return $ [opc NOP "unsupported"]
 
           trB :: (KId, Closure) -> ConvM [Instr]
 
@@ -78,26 +91,7 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
             r2 <- getReg k
             return $ [opc (MOV r2 r1) (printf "%s -> %s" k n )]
 
---          trB (n, e)        = return $ tr e ++ [opc (MOV (R 1) (R 0)) (printf "expr -> %s" n) ]
-
-          trB (n, e@(CApplCls _ _)) = do
-            r2 <- addReg n
-            let rr = retvalReg
-            e' <- tr e
-            return $ e' ++ [op (MOV rr r2)]
-
-
-          trB (n, e@(CApplDir _ _)) = do
-            r2 <- addReg n
-            let rr = retvalReg
-            e' <- tr e
-            return $ e' ++ [op (MOV rr r2)]
-
-          trB (n, e)  = do
-            r <- getReg n
-            trace ("TRACE: died at " ++ (prettyShow r) ++ " " ++ prettyShow e) $ return ()
-            undefined
-          -- error "JOPA --- what reg binded to the expression? " ++ n -- (prettyShow e) -- return $ tr e ++ [opc (MOV (R 1) (R 0)) (printf "expr -> %s" n) ]
+          trB (n, e) = addReg n >>= flip tr e
 
           addReg :: KId -> ConvM R
           addReg n = do
@@ -108,6 +102,9 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
           getReg n = do
             r <- gets (M.lookup n . regmap)
             if isJust r then (return.fromJust) r else addReg n
+
+          getReg' n = do
+            gets (M.lookup n . regmap) >>= return
 
           newreg :: ConvM R
           newreg = do

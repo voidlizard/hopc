@@ -53,6 +53,7 @@ main = do
 
                    liftIO $ putStrLn "\n\nTinyC\n" 
                    liftIO $ putStrLn $ prettyShow ir
+                   liftIO $ putStrLn "\n" 
 
 
         reportStatus st
