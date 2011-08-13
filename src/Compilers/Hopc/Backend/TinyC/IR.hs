@@ -7,6 +7,7 @@ import Data.Typeable
 
 import Data.Generics.PlateData
 import Text.PrettyPrint.HughesPJClass
+import Text.Printf
 
 type LabelId = String
 type RId = Int
@@ -37,8 +38,25 @@ op x = I x ""
 opc :: Op -> Desc -> Instr
 opc x s = I x s
 
+instance Pretty IR where
+    pPrintPrec l p (IR op) = vcat $ map (pPrintPrec l p) op
+
 instance Pretty Instr where
-    pPrintPrec _ _ x = undefined
+    pPrintPrec l p (I (LABEL l1) dsc) = text (l1++":") $$ nest 32 (text " ;" <+> text dsc)
+    pPrintPrec l p (I op dsc)         = text "" $$ nest 10 ( pPrintPrec l p op $$ nest 32 (text " ;" <+> text dsc) )
+
+instance Pretty R where
+    pPrintPrec l p (R id) = text (printf "r%s" (show id))
+
+instance Pretty JumpCnd where
+    pPrintPrec l p (JumpFake r) = prettyParen True $ text "some" <+> pPrintPrec l p r
 
 instance Pretty Op where
-    pPrintPrec _ _ x = undefined
+    pPrintPrec l p (MOV r1 r2)  = text "mov"     <+> (pPrintPrec l p r1) <+> (pPrintPrec l p r2)
+    pPrintPrec l p (CALL l1 l2) = text "call"    <+> text l1
+    pPrintPrec l p (CONST l1 r) = text "const"   <+> text l1 <+> pPrintPrec l p r
+    pPrintPrec l p (CJUMP c l1) = text "jmp-cnd" <+> (pPrintPrec l p c) <+> text l1
+    pPrintPrec l p (JUMP l1)    = text "jmp"     <+> text l1
+    pPrintPrec l p (LABEL l1)   = text "label"   <+> text l1 <+> text ":"
+    pPrintPrec l p (NOP)        = text "nop"
+

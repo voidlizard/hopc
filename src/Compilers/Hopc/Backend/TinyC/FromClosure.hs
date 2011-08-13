@@ -40,8 +40,8 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
           tr x = [op NOP]
 
           trB (n, (CInt v)) = [opc (CONST (show v) (R 0)) (printf "%d -> %s" v n)]
-          trB (n, (CStr s)) = [opc (CONST s (R 0)) (printf "'%s' -> %s" s n)]
-          trB (n, e)        = tr e ++ [opc (MOV (R 1) (R 0)) (printf " expr -> %s" n) ]
+          trB (n, (CStr s)) = [opc (CONST "Sx" (R 0)) (printf "'%s' -> %s" s n)]
+          trB (n, e)        = tr e ++ [opc (MOV (R 1) (R 0)) (printf "expr -> %s" n) ]
 
 
 --          p (CApplDir n _ ) r = concat r ++ [CALL  n ""]

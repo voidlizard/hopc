@@ -46,10 +46,11 @@ main = do
 
                    c1 <- C.convert k >>= E.eliminate
 
-                   tc@(IR op) <- FC.convert c1
+                   ir <- FC.convert c1
 
                    liftIO $ putStrLn $ prettyShow c1 
-                   liftIO $ putStrLn $ intercalate "\n" $ map show op
+                   liftIO $ putStrLn "\n\nTinyC\n" 
+                   liftIO $ putStrLn $ prettyShow ir
 
 
         reportStatus st
