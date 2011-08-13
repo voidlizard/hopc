@@ -5,6 +5,7 @@ import System.IO (stdin)
 import qualified Data.ByteString as BS
 
 import Data.Either
+import Data.List
 import Control.Monad.Error
 import Compilers.Hopc.Frontend.Lisp.Parse
 import Compilers.Hopc.Frontend.KTree
@@ -18,7 +19,7 @@ import qualified Compilers.Hopc.Frontend.Eliminate as E
 import qualified Compilers.Hopc.Typing.Types as T
 import qualified Compilers.Hopc.Typing.Infer as I
 
-import qualified Compilers.Hopc.Backend.TinyC.IR as IR
+import Compilers.Hopc.Backend.TinyC.IR
 import qualified Compilers.Hopc.Backend.TinyC.FromClosure as FC
 
 import Compilers.Hopc.Compile
@@ -44,8 +45,12 @@ main = do
                                    >>= L.flattenM
 
                    c1 <- C.convert k >>= E.eliminate
-                   tc <- FC.convert c1
+
+                   tc@(IR op) <- FC.convert c1
+
                    liftIO $ putStrLn $ prettyShow c1 
+                   liftIO $ putStrLn $ intercalate "\n" $ map show op
+
 
         reportStatus st
 
