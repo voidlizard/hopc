@@ -22,7 +22,7 @@ import Text.PrettyPrint.HughesPJClass (prettyShow)
 import Text.Printf
 import Debug.Trace
 
-data Conv = Conv { regno :: Int, regmap :: M.Map KId R }
+data Conv = Conv { regno :: Int, lbl :: Int, regmap :: M.Map KId R, funlbl :: M.Map KId LabelId }
 
 type ConvM = StateT Conv CompileM
 
@@ -50,15 +50,21 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
 
           tr r (CApplCls n args) = do
             rs <- mapM getReg' args >>= return . unwords . ((:) n) .  map (maybe "r?" prettyShow)
-            return $ [opc (CALL n "") rs] ++ [opc (MOV retvalReg r) "ret. val."]
+--            l <- getFunLbl n
+            r <- getReg n  -- TODO: CALL-CLOSURE
+            let r' = prettyShow r
+            return $ [opc (CALL r' "") ("call-closure")] ++ [opc (MOV retvalReg r) "ret. val."]
           
           tr r (CApplDir n args) = do
             rs <- mapM getReg' args >>= return . unwords . ((:) n) .  map (maybe "r?" prettyShow)
-            return $ [opc (CALL n "") rs] ++ [opc (MOV retvalReg r) (printf "retval -> %s" (prettyShow r))]
+            l <- getFunLbl n
+            return $ [opc (CALL l "") rs] ++ [opc (MOV retvalReg r) (printf "retval -> %s" (prettyShow r))]
 
-          tr r (CMakeCls n args) = return $ [opc NOP "make-closure"]
+          tr r (CMakeCls n args) = do
+            rr <- newreg
+            return $ [opc NOP "make-closure", opc (MOV rr r) n]
 
-          tr r (CVar n)          = do
+          tr r (CVar n) = do
             r2 <- getReg n
             return $ [opc (MOV r2 r) (printf "%s -> %s" n (prettyShow r))]
 
@@ -67,12 +73,13 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
             c2 <- tr r e2
             r  <- getReg n
 
-            let l1 = "L1" -- FIXME: generate label
+            l1 <- newlbl 
+            l3 <- newlbl
+
             let ll1 = LABEL l1
-            let l3 = "L3"
             let ll3 = LABEL l3
 
-            return $ op (CJUMP (JumpFake r) l1) : c2 ++ op (JUMP "L3") : (op ll1) : c1 ++ op (LABEL "L3") : []
+            return $ op (CJUMP (JumpFake r) l1) : c2 ++ op (JUMP l3) : (op ll1) : c1 ++ op ll3 : []
 
           tr r x = return $ [opc NOP "unsupported"]
 
@@ -90,6 +97,24 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
             r1 <- addReg n
             r2 <- getReg k
             return $ [opc (MOV r2 r1) (printf "%s -> %s" k n )]
+
+          trB (n, e@(CFun (Fun fn args free k))) = do
+        
+            fstart <- newlbl
+            addFunLbl  n fstart 
+
+            st@(Conv{lbl=l, funlbl=fl}) <- get
+
+            let newst = init{lbl = l, funlbl = fl}
+
+            (code, (Conv{lbl=nl})) <- lift $ flip runStateT newst $ do
+                mapM_ addReg (args ++ free)
+                tr retvalReg k
+            
+            modify (\x -> x{lbl=nl})
+
+            return $ opc (LABEL fstart) fn : code ++ [opc RET "ret"]
+
 
           trB (n, e) = addReg n >>= flip tr e
 
@@ -113,5 +138,26 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
             put s{regno = n+1}
             return r
 
-          init  = Conv { regno = 3, regmap = M.empty } -- FIXME: remove the hardcode
+          newlbl :: ConvM LabelId
+          newlbl = do
+            s@(Conv {lbl = n}) <- get
+            put s{lbl = n+1}
+            return $ "L" ++ (show n)
+
+          addFunLbl :: KId -> LabelId -> ConvM ()
+          addFunLbl n l = do
+            modify (\x@(Conv {funlbl=fl}) -> x{funlbl=M.insert n l fl})
+
+          getFunLbl :: KId -> ConvM LabelId -- TODO: error handling (unknown label)
+          getFunLbl n = do
+            l <- gets (M.lookup n . funlbl)
+            if isJust l
+                then (return.fromJust) l
+                else do
+                    e <- lift $ getEntry n
+                    if isJust e
+                        then return n
+                        else error $ "UNKNOWN LABEL FOR: " ++ n  -- TODO: error handling (unknown label)
+
+          init  = Conv {regno = 3, lbl = 0, regmap = M.empty, funlbl = M.empty} -- FIXME: remove the hardcode
 

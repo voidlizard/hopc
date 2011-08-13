@@ -29,6 +29,7 @@ data Op =   MOV   R R
           | CJUMP JumpCnd LabelId
           | JUMP  LabelId
           | LABEL LabelId
+          | RET
           | NOP   
           deriving (Eq, Show, Data, Typeable)
 
@@ -43,7 +44,12 @@ instance Pretty IR where
 
 instance Pretty Instr where
     pPrintPrec l p (I (LABEL l1) dsc) = text (l1++":") $$ nest 42 (text " ;" <+> text dsc)
-    pPrintPrec l p (I op dsc)         = text "" $$ nest 10 ( pPrintPrec l p op $$ nest 32 (text " ;" <+> text dsc) )
+    pPrintPrec l p (I op@(RET) dsc)   = text "" $$ nest 10 (pPrintPrec l p op
+                                                $$ nest 32 (text " ;" <+> text dsc))
+                                                $+$ nest 0 (text "")
+
+    pPrintPrec l p (I op dsc)         = text "" 
+                                        $$ nest 10 (pPrintPrec l p op $$ nest 32 (text " ;" <+> text dsc))
 
 instance Pretty R where
     pPrintPrec l p (R id) = text (printf "r%s" (show id))
@@ -59,4 +65,5 @@ instance Pretty Op where
     pPrintPrec l p (JUMP l1)    = text "jmp"     <+> text l1
     pPrintPrec l p (LABEL l1)   = text "label"   <+> text l1 <+> text ":"
     pPrintPrec l p (NOP)        = text "nop"
+    pPrintPrec l p (RET)        = text "ret"
 

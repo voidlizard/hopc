@@ -39,6 +39,11 @@ addEntry n t = do
     let d' = M.insert n (Entry {eType = t}) d
     put (CompileState d')
 
+getEntry :: KId -> CompileM (Maybe Entry)
+getEntry n = do
+    (CompileState d) <- get
+    return $ M.lookup n d
+
 names :: CompileM (S.Set KId)
 names = do
     (CompileState d) <- get
