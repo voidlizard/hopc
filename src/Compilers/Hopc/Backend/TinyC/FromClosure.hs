@@ -20,7 +20,6 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
     return $ IR []
     
     where 
-          
           p (CApplDir n _ ) r = concat r ++ [CALL  n ""]
           p (CLet n (CInt v) _) r = trace ("TRACE: convert let " ++ n) $ (CONST (show v) (R 0)) : concat r
           p (CLetR n e) r = trace ("TRACE: convert letrec ") $ NOP : concat r
