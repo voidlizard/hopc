@@ -49,8 +49,7 @@ There is almost no any macro system or ideas how to implement it at the moment.
 ROADMAP
 -------
 
-Beta release
-~~~~~~~~~~~~
+### Beta release ###
 
   - Static types
   - C code generation
@@ -59,20 +58,19 @@ Beta release
   - C code generation with basic optimization: alpha conversion, 
     beta reduction, closure elimination, constant folding, let flattening
 
-Nearest future
-~~~~~~~~~~~~~~
+### Nearest future ###
 
   - Using Hoopl for dataflow analysis 
   - Assembly generation
 
-Far future
-~~~~~~~~~~
+### Far future ###
 
 ???
 
 
 FAQ
-~~~
+---
+
 
 Q: Why not to use LLVM?
 A: It's too complicated in it's backend aspects. It has a huge codebase. It takes a lot of time to get into it.
