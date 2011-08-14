@@ -54,13 +54,11 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
 --            l <- getFunLbl n
             r <- getReg n  -- TODO: CALL-CLOSURE
             let r' = prettyShow r
-            return $ [opc (CALL r' "") ("call-closure")] ++ [opc (MOV retvalReg r) "ret. val."]
+            return $ [opc (CALL r' "") ("call-closure")] ++ mov retvalReg r "ret. val."
           
           tr r (CApplDir n args) = do
             entry <- lift $ getEntry n
             applDir r n args entry
-
---            return $ [opc (CALL l "") rs] ++ [opc (MOV retvalReg r) (printf "retval -> %s" (prettyShow r))]
 
           tr r (CMakeCls n args) = do
             rr <- newreg
@@ -68,7 +66,7 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
 
           tr r (CVar n) = do
             r2 <- getReg n
-            return $ [opc (MOV r2 r) (printf "%s -> %s" n (prettyShow r))]
+            return $ mov r2 r (printf "%s -> %s" n (prettyShow r))
 
           tr r (CCond n e1 e2) = do
             c1 <- tr r e1
@@ -91,7 +89,7 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
 
           tr r1 (CVar k) = do
             r2 <- getReg k
-            return $ [op (MOV r2 r1)]
+            return $ mov r2 r1 ""
 
           tr r x = return $ [opc NOP $"unsupported " ++ (prettyShow x)]
 
@@ -126,7 +124,7 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
             -- TODO: regs <> args -> unknown var check
             -- TODO: regs <> at   -> bad function call
 
-            return $ [opc (CALL_FOREIGN ffn regs) ""] ++ [opc (MOV retvalReg r) (printf "retval -> %s" (prettyShow r))] -- TODO: remove boilerplat
+            return $ [opc (CALL_FOREIGN ffn regs) ""] ++ mov retvalReg r (printf "retval -> %s" (prettyShow r)) -- TODO: remove boilerplat
 
           applDir r n args (Just (Entry (TFun (TFunLocal) at rt))) = do
             regs <- getRegList args
@@ -137,7 +135,7 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
             -- TODO: regs <> args -> unknown var check
             -- TODO: regs <> at   -> bad function call
 
-            return $ [opc (CALL_LOCAL l regs) n] ++ [opc (MOV retvalReg r) (printf "retval -> %s" (prettyShow r))] -- TODO: remove boilerplate
+            return $ [opc (CALL_LOCAL l regs) n] ++  mov retvalReg r (printf "retval -> %s" (prettyShow r)) -- TODO: remove boilerplate
 
           applDir r n args (Just x) = do
             error $ "CALLING NOT-APPLICABLE ENTITY" ++ n --TODO: error handling
@@ -185,14 +183,11 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
           getFunLbl n = do
             l <- gets (M.lookup n . funlbl)
             if isJust l then (return.fromJust) l else newlbl >>= addFunLbl n
---            trace ("TRACE:  getFunLbl " ++ n ++ " " ++ (show l)) $ return ()
---            if isJust l
---                then (return.fromJust) l
---                else do
---                    e <- lift $ getEntry n
---                    if isJust e
---                        then newlbl >>= addFunLbl n
---                        else error $ "UNKNOWN LABEL FOR: " ++ n  -- TODO: error handling (unknown label)
 
           init  = Conv {regno = 3, lbl = 0, regmap = M.empty, funlbl = M.empty} -- FIXME: remove the hardcode
+
+
+mov (R a) (R b) dsc | a == b = []
+mov a b dsc = [opc (MOV a b) dsc]
+
 
