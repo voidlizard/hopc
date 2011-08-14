@@ -1,0 +1,15 @@
+
+($ ccall "display" :string :unit $)
+
+(define (mutapaka) (display "mutapaka"))
+
+(define (qqq a b c) 
+    (display a)
+    (display b)
+    (display c)
+)
+
+(define (boo x) (qqq "A" "B" x))
+
+(boo "C")
+

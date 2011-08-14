@@ -1,0 +1,12 @@
+
+
+($ ccall "display" :string :unit $)
+
+(define (qqq a b c) 
+    (display a)
+    (display b)
+    (display c)
+)
+
+(qqq "A" "B" "C")
+

@@ -44,8 +44,10 @@ main = do
 
                c1 <- C.convert k >>= E.eliminate
 
+               C.addTopLevelFunctions c1
+--               c1 <- C.convert k -- >>= E.eliminate
 
-               liftIO $ putStrLn $ prettyShow c1 
+               liftIO $ putStrLn $ prettyShow c1
 
                ir <- FC.convert c1
 

@@ -8,7 +8,7 @@
 ($ ccall ">" :int :int :int $)
 
 (let ((x (random))
-      (main (lambda (y) (begin (display "PIU ") (putint x) (newline) (if (> y 0) (main (- y 1)) (0) ) )
+      (main (lambda (y) (begin (display "PIU ") (putint x) (newline) (if (> y 0) (main (- y 1)) 0 ) ) ;; 
                         ))
       )
 

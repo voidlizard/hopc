@@ -1,0 +1,6 @@
+
+
+($ ccall "display" :string :unit $)
+
+(display "QQQ")
+

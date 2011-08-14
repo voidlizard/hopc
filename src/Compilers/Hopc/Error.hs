@@ -7,7 +7,10 @@ import Control.Monad.State
 import Control.Monad.Error
 import Control.Exception
 
-data CompileError = GeneralError | ParseError String  deriving (Show, Typeable)
+data CompileError =   GeneralError 
+                    | InternalError 
+                    | TypingError 
+                    | ParseError String  deriving (Show, Typeable)
 
 instance Exception CompileError 
 instance Error CompileError 

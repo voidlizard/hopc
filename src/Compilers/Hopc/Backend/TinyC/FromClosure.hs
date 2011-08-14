@@ -83,37 +83,35 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
 
             return $ op (CJUMP (JumpFake r) l1) : c2 ++ op (JUMP l3) : (op ll1) : c1 ++ op ll3 : []
 
-          tr r x = return $ [opc NOP "unsupported"]
+          tr r (CInt v)= do
+              return $ [op (CONST (show v) r)]
+
+          tr r (CStr s) = do
+            return $ [op (CONST "Sx" r)]
+
+          tr r1 (CVar k) = do
+            r2 <- getReg k
+            return $ [op (MOV r2 r1)]
+
+          tr r x = return $ [opc NOP $"unsupported " ++ (prettyShow x)]
 
           trB :: (KId, Closure) -> ConvM [Instr]
 
-          trB (n, (CInt v)) = do
-            r <- addReg n 
-            return $ [opc (CONST (show v) r) (printf "%d -> %s" v n)]
-
-          trB (n, (CStr s)) = do
-            r <- addReg n
-            return $ [opc (CONST "Sx" r) (printf "'%s' -> %s" s n)]
-
-          trB (n, (CVar k)) = do
-            r1 <- addReg n
-            r2 <- getReg k
-            return $ [opc (MOV r2 r1) (printf "%s -> %s" k n )]
-
           trB (n, e@(CFun (Fun fn args free k))) = do
- 
-            fstart <- newlbl
-            addFunLbl  n fstart 
+
+            fstart <- getFunLbl n
+
+            trace ("TRACE: convert fstart " ++ n ++ " " ++ (show fstart)) $ return ()
 
             st@(Conv{lbl=l, funlbl=fl}) <- get
 
             let newst = init{lbl = l, funlbl = fl}
 
-            (code, (Conv{lbl=nl})) <- lift $ flip runStateT newst $ do
+            (code, (Conv{lbl=nl, funlbl=nfl})) <- lift $ flip runStateT newst $ do
                 mapM_ addReg (args ++ free)
                 tr retvalReg k
  
-            modify (\x -> x{lbl=nl})
+            modify (\x -> x{lbl=nl, funlbl=nfl})
 
             return $ opc (LABEL fstart) fn : code ++ [opc RET "ret"]
 
@@ -121,21 +119,42 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
           trB (n, e) = addReg n >>= flip tr e
 
           applDir :: R -> KId -> [KId] -> Maybe Entry -> ConvM [Instr]
+
           applDir r n args (Just (Entry (TFun (TFunForeign ffn) at rt))) = do
-            regs' <- mapM getReg' args
-            let regs = catMaybes regs'
+            regs <- getRegList args 
 
             -- TODO: regs <> args -> unknown var check
             -- TODO: regs <> at   -> bad function call
 
+            return $ [opc (CALL_FOREIGN ffn regs) ""] ++ [opc (MOV retvalReg r) (printf "retval -> %s" (prettyShow r))] -- TODO: remove boilerplat
+
+          applDir r n args (Just (Entry (TFun (TFunLocal) at rt))) = do
+            regs <- getRegList args
             l <- getFunLbl n
-            return $ [opc (CALL_FOREIGN ffn regs) ""] ++ [opc (MOV retvalReg r) (printf "retval -> %s" (prettyShow r))]
+
+            trace ("TRACE: appDir  " ++ (show n) ++ " " ++ (show l)) $ return ()
+
+            -- TODO: regs <> args -> unknown var check
+            -- TODO: regs <> at   -> bad function call
+
+            return $ [opc (CALL_LOCAL l regs) n] ++ [opc (MOV retvalReg r) (printf "retval -> %s" (prettyShow r))] -- TODO: remove boilerplate
+
+          applDir r n args (Just x) = do
+            error $ "CALLING NOT-APPLICABLE ENTITY" ++ n --TODO: error handling
+
+          applDir r n args Nothing = do
+            trace ("TRACE: appDir  NOT FOUND" ++ (show n)) $ return ()
+            error "oops"
 
           addReg :: KId -> ConvM R
           addReg n = do
             reg <- newreg
             modify (\x@(Conv {regmap=r}) -> x{regmap=M.insert n reg r})
             return reg
+
+          getRegList args = do 
+            regs <- mapM getReg' args
+            return $ catMaybes regs
 
           getReg n = do
             r <- gets (M.lookup n . regmap)
@@ -157,20 +176,23 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
             put s{lbl = n+1}
             return $ "L" ++ (show n)
 
-          addFunLbl :: KId -> LabelId -> ConvM ()
+          addFunLbl :: KId -> LabelId -> ConvM LabelId 
           addFunLbl n l = do
             modify (\x@(Conv {funlbl=fl}) -> x{funlbl=M.insert n l fl})
+            return l 
 
           getFunLbl :: KId -> ConvM LabelId -- TODO: error handling (unknown label)
           getFunLbl n = do
             l <- gets (M.lookup n . funlbl)
-            if isJust l
-                then (return.fromJust) l
-                else do
-                    e <- lift $ getEntry n
-                    if isJust e
-                        then return n
-                        else error $ "UNKNOWN LABEL FOR: " ++ n  -- TODO: error handling (unknown label)
+            if isJust l then (return.fromJust) l else newlbl >>= addFunLbl n
+--            trace ("TRACE:  getFunLbl " ++ n ++ " " ++ (show l)) $ return ()
+--            if isJust l
+--                then (return.fromJust) l
+--                else do
+--                    e <- lift $ getEntry n
+--                    if isJust e
+--                        then newlbl >>= addFunLbl n
+--                        else error $ "UNKNOWN LABEL FOR: " ++ n  -- TODO: error handling (unknown label)
 
           init  = Conv {regno = 3, lbl = 0, regmap = M.empty, funlbl = M.empty} -- FIXME: remove the hardcode
 

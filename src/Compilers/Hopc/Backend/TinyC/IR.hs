@@ -26,6 +26,7 @@ data Instr = I Op Desc
 data Op =   MOV   R R
           | CALL  LabelId LabelId
           | CALL_FOREIGN LabelId [R]
+          | CALL_LOCAL   LabelId [R]
           | CONST LabelId R
           | CJUMP JumpCnd LabelId
           | JUMP  LabelId
@@ -61,7 +62,8 @@ instance Pretty JumpCnd where
 instance Pretty Op where
     pPrintPrec l p (MOV r1 r2)  = text "mov"     <+> (pPrintPrec l p r1) <+> (pPrintPrec l p r2)
     pPrintPrec l p (CALL l1 l2) = text "call"    <+> text l1
-    pPrintPrec l p (CALL_FOREIGN l1 r) = text "call-foreign" <+> text l1 <+> hcat (map (pPrintPrec l p) r)
+    pPrintPrec l p (CALL_FOREIGN l1 r) = text "call-foreign" <+> text l1 <+> fsep (map (pPrintPrec l p) r)
+    pPrintPrec l p (CALL_LOCAL l1 r) = text "call-local" <+> text l1 <+> fsep (map (pPrintPrec l p) r)
     pPrintPrec l p (CONST l1 r) = text "const"   <+> text l1 <+> pPrintPrec l p r
     pPrintPrec l p (CJUMP c l1) = text "jmp-cnd" <+> (pPrintPrec l p c) <+> text l1
     pPrintPrec l p (JUMP l1)    = text "jmp"     <+> text l1

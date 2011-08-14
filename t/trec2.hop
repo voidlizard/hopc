@@ -1,6 +1,9 @@
 
+($ ccall random :int $)
+($ ccall + :int :int :int $)
+
 (define (main)
-    (let ((x 22)
+    (let ((x (random))
           (fx (lambda (n) (fy (+ x n))))
           (fy (lambda (n) (fx (- x n))))
          )

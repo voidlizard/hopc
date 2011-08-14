@@ -1,5 +1,5 @@
 {-# LANGUAGE EmptyDataDecls, DeriveDataTypeable #-}
-module Compilers.Hopc.Frontend.Closure (convert, Closure(..), Fun(..), eliminate)
+module Compilers.Hopc.Frontend.Closure (convert, Closure(..), Fun(..), eliminate, addTopLevelFunctions)
                                         where
 
 import qualified Data.Map as M
@@ -20,6 +20,7 @@ import Debug.Trace
 
 import Compilers.Hopc.Compile
 import Compilers.Hopc.Frontend.KTree
+import Compilers.Hopc.Frontend.Types
 --import qualified Compilers.Hopc.Frontend.Eliminate as E
 
 data Fun = Fun KId [KId] [KId] Closure deriving (Show, Eq, Data, Typeable)
@@ -41,6 +42,23 @@ data Closure =  CInt Integer
 data Conv = Conv { fns :: [(KId, Fun)], cbind :: Maybe KId } deriving (Show)
 
 type ConvM = StateT Conv CompileM
+
+
+addTopLevelFunctions :: Closure -> CompileM ()
+
+addTopLevelFunctions (CLetR binds _) = mapM_ addFnEntry $ foldl bind [] binds
+    where bind acc (_,(CFun f)) = f:acc
+          bind acc _            = acc
+
+addTopLevelFunctions (CLet n (CFun f) _) = addFnEntry f
+
+addTopLevelFunctions x = return ()
+
+addFnEntry (Fun fn args free _) = do
+    -- TODO: type inference ?? Where?? When?
+    let vars = map TVar (args ++ free)
+    let func = TFun TFunLocal vars (TVar ("tret_" ++ fn))
+    addEntry fn func
 
 convert :: KTree -> CompileM Closure
 convert k = do
@@ -84,9 +102,13 @@ convert k = do
 
               let fn = lookup n fs
 
---              trace (printf "TRACE: KApp %s %s --- has entry %s (bind: %s)" n (show args) (show fn) (show mb)) $ return ()
+              trace (printf "TRACE: KApp %s %s --- has entry %s (bind: %s) (fs: %s) " n (show args) (show fn) (show mb) (show fs)) $ return ()
 
-              let nofree = not $ if isJust fn then hasFree (fromJust fn) else True --False -- error $ "call of unknown function: " ++ fn --False
+              let nofree = not $ if isJust fn
+                                    then hasFree (fromJust fn)
+                                    else False 
+--                                         error $ "call of unknown function: " ++ (show n) ++ " " ++ (show fn)  ++ " <<>>>>" ++ (show fs)--False
+--              let nofree = not $ if isJust fn then hasFree (fromJust fn) else True --False -- error $ "call of unknown function: " ++ fn --False
               let self = maybe False (== n) mb
               let free = maybe [] getFree fn
               let fn = if g then n else (fname n)
@@ -189,6 +211,11 @@ convDirectCls k = evalState (descendBiM tr k) init
             fn <- getBindFun n 
             trace (printf "TRACE: APPLY-CLOSURE %s %s" n (show fn)) $ do
                 elimAppl fn x
+
+          tr x@(CApplDir n args) = do
+            fn <- getBindFun n 
+            trace (printf "TRACE: APPLY-DIRECT %s %s" n (show fn)) $ do
+                return $ maybe x (\(Fun fn _ _ _) -> CApplDir fn args) fn
 
           tr x = return x
 
@@ -305,6 +332,11 @@ eliminate k = trace "TRACE: eliminate" $
             e' <- tr e
             return $ CFun (Fun fn args free e')
 
+          tr x@(CCond n e1 e2) = do
+            e1' <- tr e1
+            e2' <- tr e2
+            return $ CCond n e1' e2'
+
           tr x = return x
 
           trB (n, e)  = do
@@ -326,7 +358,9 @@ eliminate k = trace "TRACE: eliminate" $
 
           elim e l (r:rs) = do
             let ebs = e : map snd l
-            let live = S.fromList $ concat $ map usage ebs
+            let rbs = map snd rs
+            let live = S.fromList $ concat $ map usage (ebs ++ rbs)
+            trace ("TRACE: eliminating " ++ (show $ fst r) ++ " " ++ (show live)) $ return ()
             r' <- trB r
             if flt live r'
               then elim e (r':l) rs

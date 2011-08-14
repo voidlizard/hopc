@@ -1,4 +1,6 @@
 
+($ ccall display :string :unit $)
+
 (define (boo x) (display x) (hoo x))
 
 (define (hoo a) (boo 22))
