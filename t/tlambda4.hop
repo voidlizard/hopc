@@ -1,0 +1,11 @@
+
+($ ccall display :string :unit $)
+
+
+(define (wtf f) (f "BLAH BLAH BLAH"))
+
+
+(wtf (lambda (s) (begin (display "JOPA KITA") (display s))))
+
+
+

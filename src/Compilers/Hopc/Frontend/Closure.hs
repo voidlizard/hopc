@@ -106,7 +106,7 @@ convert k = do
 
               let nofree = not $ if isJust fn
                                     then hasFree (fromJust fn)
-                                    else False 
+                                    else True 
 --                                         error $ "call of unknown function: " ++ (show n) ++ " " ++ (show fn)  ++ " <<>>>>" ++ (show fs)--False
 --              let nofree = not $ if isJust fn then hasFree (fromJust fn) else True --False -- error $ "call of unknown function: " ++ fn --False
               let self = maybe False (== n) mb
@@ -132,7 +132,8 @@ convert k = do
              
               addFun n argz [] (CUnit) -- FIXME: function's dummy. what a perversion...
 
-              eb'  <- conv eb >>= lift . eliminate
+              eb'  <- conv eb -- >>= lift . eliminate
+--              eb'  <- conv eb
 
               let fv c  = do
                   let live = S.fromList $  para alive c
@@ -143,7 +144,7 @@ convert k = do
               addFun n argz free eb'
 
               when (free /= []) $ do --- FIXME: real perversion: fix function body
-                eb'' <- conv eb >>= lift . eliminate
+                eb'' <- conv eb -- >>= lift . eliminate
                 free <- fv eb''
                 addFun n argz free eb''
 
@@ -360,7 +361,7 @@ eliminate k = trace "TRACE: eliminate" $
             let ebs = e : map snd l
             let rbs = map snd rs
             let live = S.fromList $ concat $ map usage (ebs ++ rbs)
-            trace ("TRACE: eliminating " ++ (show $ fst r) ++ " " ++ (show live)) $ return ()
+--            trace ("TRACE: eliminating " ++ (show $ fst r) ++ " " ++ (show live)) $ return ()
             r' <- trB r
             if flt live r'
               then elim e (r':l) rs

@@ -4,9 +4,9 @@
 ($ ccall - :int :int :int $)
 
 (define (main)
-    (let ((x (random))
+    (let ((x 55)
           (fx (lambda (n) (fy (+ x n))))
-          (fy (lambda (n) (fx (- x n))))
+          (fy (lambda (n) (fx (- n x))))
          )
          (fx 1)
     )

@@ -5,7 +5,7 @@
 
 (define (main)
     (let ((x (random))
-          (fx (lambda (n) (fy (+ x n))))
+          (fx (lambda (n) (fx (+ 1 n))))
           (fy (lambda (n) (fx (- x n))))
          )
          (fx 1)
