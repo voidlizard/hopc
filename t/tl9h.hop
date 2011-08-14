@@ -1,0 +1,10 @@
+(letrec ((f_0 (lambda (x_1) (let (_tmp0_2 x_1)
+                               (let (_tmp1_3 1)
+                                  (+ x_1 _tmp1_3))))))
+   ())
+
+(letrec ((fun_f_0 (func (x_1) (let (_tmp0_2 x_1)
+                                 (let (_tmp1_3 1)
+                                    (apply-direct + x_1 _tmp1_3)))))
+         (f_0 (make-closure fun_f_0)))
+   ())

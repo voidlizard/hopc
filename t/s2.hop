@@ -1,0 +1,23 @@
+; compiler's directives are introduced as ($ directive arg ... $)
+
+($ ccall "display" :string :unit $)
+($ ccall "gpio-set" :int :int :unit $)
+($ ccall "disable-interrupts" :unit $)
+($ ccall "enable-interrupts"  :unit $)
+
+(define PORTA 0)
+(define PORTB 1)
+(define PORTC 2)
+
+(define (cli f) (disable-interrupts)
+                (f)
+                (enable-interrupts))
+
+(define (init-ports) 
+    (gpio-set PORTA 255)
+    (gpio-set PORTB 255)
+    (gpio-set PORTC 255)
+)
+
+(cli init-ports)
+

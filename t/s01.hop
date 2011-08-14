@@ -1,0 +1,4 @@
+
+($ ccall "uart0_putc" :int  $)
+
+

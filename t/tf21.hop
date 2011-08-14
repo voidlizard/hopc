@@ -1,0 +1,7 @@
+
+(define (foo) (display "JOPA"))
+(define (goo) foo)
+
+
+((goo))
+

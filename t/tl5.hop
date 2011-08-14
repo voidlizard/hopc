@@ -1,0 +1,6 @@
+
+(let (main (lambda () 
+	(let (x1 (print "HELLO WORLD"))
+		())
+)) ())
+

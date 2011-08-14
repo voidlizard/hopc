@@ -1,0 +1,7 @@
+
+($ ccall "display" :string :unit $)
+
+(define print display)
+
+(print "QQQ")
+

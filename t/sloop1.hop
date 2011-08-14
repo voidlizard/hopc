@@ -1,0 +1,19 @@
+
+($ ccall "display" :string :unit $)
+($ ccall "newline" :unit $)
+($ ccall "sleep"   :int :unit $)
+($ ccall "putint"   :int :unit $)
+($ ccall "random"   :int $)
+($ ccall "-" :int :int :int $)
+($ ccall ">" :int :int :int $)
+
+(let ((x (random))
+      (main (lambda (y) (begin (display "PIU ") (putint x) (newline) (if (> y 0) (main (- y 1)) (0) ) )
+                        ))
+      )
+
+     (main 10)
+)
+
+
+

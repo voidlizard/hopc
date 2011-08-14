@@ -1,0 +1,11 @@
+
+(define (main) 
+    (let ((x 1)
+          (f1 (lambda (y) (+ x y)))
+          (f2 (lambda (z) (* (f1 z) y)))
+         ) 
+    (f2 2))
+)
+
+(main)
+

@@ -1,0 +1,8 @@
+
+; ($ ccall "+" :int :int :int $)
+
+(define (foo) (lambda (x) (+ x 1)))
+
+
+((foo) 22)
+

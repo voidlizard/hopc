@@ -1,0 +1,17 @@
+
+($ ccall "display" :string :unit $)
+($ ccall "sleep"   :int :unit $)
+
+(define (pysh s) (display s))
+
+(define (main)
+    (display "PREVED")
+    (pysh)
+    (sleep 1)
+    (pysh)
+    (let (q pysh) (q "MEDVED"))
+    (pysh)
+)
+
+(main)
+

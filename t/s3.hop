@@ -1,0 +1,7 @@
+
+($ ccall "display" :string :unit $)
+
+(lambda () (begin (display "ONE") (display "TWO") (display "THREE") )) ;  (display "TWO") (display "THREE)))
+
+
+

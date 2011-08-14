@@ -1,0 +1,28 @@
+
+; compiler's directives are introduced as ($ directive arg ... $)
+
+($ ccall "display" :string :unit $)
+($ ccall "+" :int :int :int $)
+($ ccall "-" :int :int :int $)
+($ ccall "*" :int :int :int $)
+($ ccall "/" :int :int :int $)
+($ ccall "gpio-set" :int :int $)
+($ ccall "disable-interrupts" :unit $)
+($ ccall "enable-interrupts"  :unit $)
+($ prim-op ">>" :1 :2 $)
+
+(define (cli f) (disable-interrupts)
+                (f)
+                (enable-interrupts))
+
+; (+ 1 2)
+; (* 1 3)
+; (/ 6 4)
+
+(cli (lambda () ((gpio-set 22 (+ 33 1))
+                 (gpio-set 55 44)
+                 (gpio-set 86 15))))
+
+
+(display "JOPA")
+

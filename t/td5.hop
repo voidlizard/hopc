@@ -1,0 +1,11 @@
+
+(define (print-hello) (display "hello world!"))
+
+(define (main)
+    (print-hello)
+    (sleep)
+    (main)
+)
+
+(main)
+

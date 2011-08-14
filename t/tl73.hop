@@ -1,0 +1,5 @@
+
+(define (func1 a) (* a 2))
+
+(func1)
+

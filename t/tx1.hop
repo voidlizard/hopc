@@ -1,0 +1,12 @@
+
+(define (main) (not-main))
+
+(define (not-main) (main))
+
+
+(letrec ((main (lambda () (main)))
+         (not-main (lambda () (not-main)))
+        )
+        (entry)
+)
+

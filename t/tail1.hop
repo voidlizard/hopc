@@ -1,0 +1,14 @@
+
+($ ccall "display" :string :unit $)
+($ ccall "sleep"   :int :unit $)
+($ ccall "minus"   :int :int :int $)
+($ ccall "gt"      :int :int :int $)
+
+(define (main x) 
+    (display "JOPA")
+    (sleep 1)
+    (if (gt x 0) (main (minus x 1)) () )
+)
+
+(main 10)
+

@@ -1,0 +1,6 @@
+
+(define (foo) (display "JOPA"))
+
+
+(let ((x foo)) (x))
+

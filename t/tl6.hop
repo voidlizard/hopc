@@ -1,0 +1,7 @@
+
+(let (main (lambda () 
+	(let (x1 (print "HELLO WORLD"))
+		( let (x2 (sleep 500)) 
+		      (main) ))
+)) (main))
+

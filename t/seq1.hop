@@ -1,0 +1,19 @@
+
+($ ccall "readInt" :int $)
+($ ccall "eq" :int :int  :int $)
+
+($ ccall "display1" :int :unit $)
+($ ccall "display2" :int :unit $)
+($ ccall "display3" :string :unit $)
+
+(if (eq (readInt) 0)
+    (display1 1)
+    (display2 2)
+)
+
+
+(display3 "OUT")
+
+(display3 "END")
+
+

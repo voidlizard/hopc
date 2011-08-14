@@ -1,0 +1,10 @@
+
+(define (kkk) (display "jopa"))
+
+(define (moo) (lambda (x) (display x)))
+
+(define (goo) kkk)
+
+((moo) "JOPA")
+
+((goo) "KITA")

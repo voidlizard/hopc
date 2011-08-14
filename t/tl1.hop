@@ -1,0 +1,8 @@
+
+(let ((f1 (lambda (a b)
+	 (let ((f2 (lambda (a b c) (+ a (- b c))))) 
+	 
+	 (f2 0 0 (+ a b))))))
+
+	 (f1 2 3))
+

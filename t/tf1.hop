@@ -1,0 +1,9 @@
+
+
+(define (foo s) (display s))
+
+(define (bar) foo)
+
+((bar) "HELLO WORLD")
+
+

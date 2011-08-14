@@ -1,0 +1,11 @@
+
+
+(define (inc a) (- a 1))
+
+(define (l) (inc 10))
+
+(l)
+
+
+
+

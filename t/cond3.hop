@@ -1,0 +1,19 @@
+
+($ ccall "eq?" :int :int :int $)
+($ ccall "display" :string :unit  $)
+
+(define x 10)
+
+(if (eq? x 1)
+    (display "1")
+    (if (eq? x 2)
+		(display "2")
+		(if (eq? x 3)
+		    (display "3")
+			(display "other")
+		)
+	)
+)
+
+(display "END")
+

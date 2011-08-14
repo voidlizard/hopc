@@ -1,0 +1,12 @@
+
+(define (main) 
+    (let ((x 1)
+          (f1 (lambda (y) (+ x y)))
+          (f2 (lambda (y) (+ y z)))
+          (f3 (lambda (w) (+ w z)))
+         ) 
+    (f1 2))
+)
+
+(main)
+

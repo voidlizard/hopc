@@ -1,0 +1,8 @@
+(define (main)
+	(forever (lambda () (display "HELLO WORLD"))
+	)
+)
+
+(main)
+
+

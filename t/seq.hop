@@ -1,0 +1,11 @@
+
+($ ccall "display" :string :unit $)
+
+
+(display "PREVED")
+(display "MEDVED")
+(display "FOO")
+(display "BAR")
+
+
+

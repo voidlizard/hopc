@@ -1,0 +1,4 @@
+(#ccall gpio-set :int :int :unit)
+
+(gpio-set 22 0)
+

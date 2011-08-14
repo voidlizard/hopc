@@ -1,0 +1,12 @@
+(letrec ((main_0 (lambda () (letrec ((x_1 1)
+                                     (f1_2 (lambda (y_3) (let (_tmp1_4 x_1)
+                                                            (let (_tmp2_5 y_3)
+                                                               (+ _tmp1_4 _tmp2_5)))))
+                                     (f2_6 (lambda (z_7) (let (_tmp4_9 z_7)
+                                                            (let (_tmp3_8 (f1_2 _tmp4_9))
+                                                               (let (_tmp5_10 y_3)
+                                                                  (* _tmp3_8 _tmp5_10)))))))
+                               (let (_tmp6_11 2)
+                                  (f2_6 _tmp6_11))))))
+   ())
+

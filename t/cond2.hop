@@ -1,0 +1,25 @@
+
+($ ccall "display" :string :unit $)
+($ ccall "random" :unit $)
+($ ccall "eq" :int :int :int $)
+
+(define (test) (if (eq (random) 1 ) 2 (if (eq (random) 2 ) 3 0) ) )
+
+(define (main)
+
+    (if (eq (test) 2)
+        (display "foo")
+        (display "bar")
+    )
+
+    (if (eq (test) 3)
+        (display "piu")
+        (display "paff")
+    )
+
+    (main)
+
+)
+
+(main)
+

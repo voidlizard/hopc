@@ -1,0 +1,13 @@
+(letrec ((fun_f2_3 (func (a_4 b_5
+                          c_6) (let (_tmp2_8 (apply-direct - b_5 c_6))
+                                  (apply-direct + a_4 _tmp2_8))))
+         (fun_f1_0 (func (a_1 b_2 a_4 b_5 a_4 b_5) (let (_tmp5_11 0)
+                                                      (let (_tmp6_12 0)
+                                                         (let (_tmp7_13 (apply-direct + a_4 b_5))
+                                                            (apply-direct fun_f2_3 _tmp5_11 _tmp6_12
+                                                                                   _tmp7_13))))))
+         (f1_0 (make-closure fun_f1_0 a_4 b_5 a_4 b_5)))
+   (let (_tmp10_16 2)
+      (let (_tmp11_17 3)
+         (apply-closure f1_0 _tmp10_16 _tmp11_17))))
+

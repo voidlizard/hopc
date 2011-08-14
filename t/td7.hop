@@ -1,0 +1,12 @@
+
+
+(define (funa) (display "JOPA"))
+(define (funb) (funa))
+(define (funa) (ping))
+(define (func) (funa))
+(define (funx) (funb))
+(define (funa) (pong))
+(define (main) (funa))
+
+(main)
+

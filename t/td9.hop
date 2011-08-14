@@ -1,0 +1,11 @@
+
+(define a 22)
+(define a 33)
+
+(define b1 (+ a 2))
+
+(define a 12)
+(define a 66)
+
+(+ a 2)
+

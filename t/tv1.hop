@@ -1,0 +1,11 @@
+
+($ ccall "display" :int :unit $)
+($ ccall tt :int $)
+($ ccall eq :int :int :int $)
+($ ccall "+" :int :int :int $)
+
+(display (if (eq (tt) 22) (+ 22 1) (+ 22 10) ) )
+
+
+
+

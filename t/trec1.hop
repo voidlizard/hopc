@@ -1,0 +1,8 @@
+
+(define (boo x) (display x) (hoo x))
+
+(define (hoo a) (boo 22))
+
+
+(boo 16)
+

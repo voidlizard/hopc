@@ -1,0 +1,10 @@
+
+($ ccall "display" :string :unit $)
+
+
+(define (f1) (lambda (x) (display "JOPA")))
+
+(let ((f2 (f1))) (f2))
+
+
+

@@ -1,0 +1,12 @@
+
+(define (main)
+    (let ((x 22)
+          (fx (lambda (n) (fy (+ x n))))
+          (fy (lambda (n) (fx (- x n))))
+         )
+         (fx 1)
+    )
+)
+
+(main)
+

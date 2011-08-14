@@ -1,0 +1,6 @@
+
+(define (f a) (display a)(f 22))
+
+(f 1)
+(f 2)
+

@@ -1,0 +1,6 @@
+
+($ ccall "display" :string :unit $)
+($ ccall "concat"  :string :string :string $)
+
+(display (concat  "hello" "world"))
+

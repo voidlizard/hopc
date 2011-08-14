@@ -4,4 +4,3 @@ cabal-dev
 *.swp
 hopc
 test-typing
-t/*

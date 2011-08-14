@@ -1,0 +1,38 @@
+
+($ ccall "+" :int :int :int $)
+($ ccall "-" :int :int :int $)
+($ ccall "*" :int :int :int $)
+($ ccall "/" :int :int :int $)
+($ ccall "display" :string :unit $)
+($ ccall "odd" :int :int $)
+
+(define (foo x) (if (odd x) (+ x 1) x ))
+
+(define y 15)
+
+(display "QQQ")
+
+(define (f1 a)
+    (let ((foo (lambda (x) (+ x 1)))
+          (bar (lambda ()  (* (foo a) 2)))
+          (zar (lambda (n) (* y (bar n))))
+          (far (lambda (n) (* n (bar 21))))
+          (goo (lambda (x) (far x)))
+          )
+         (zar a)
+   )
+)
+
+(define x 2)
+
+(define (f2 s) (display s))
+
+(display (foo 11))
+
+(f1 (+ x 1))
+(f1 (+ x 2))
+
+(f2 "HELLO WORLD")
+(f2 "HELLO THERE")
+
+

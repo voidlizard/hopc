@@ -1,0 +1,6 @@
+
+(let (x 1)
+    (let (l1 (lambda (y) (+ x y)))
+        (l1 33)
+    ))
+

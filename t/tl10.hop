@@ -1,0 +1,9 @@
+
+(define n 21)
+
+(define (subn a) (- a n))
+
+(subn 100)
+
+
+

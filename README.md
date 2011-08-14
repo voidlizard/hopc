@@ -65,7 +65,8 @@ Beta release
 Nearest future
 ~~~~~~~~~~~~~~
 
-Using Hoopl for dataflow analysis 
+  - Using Hoopl for dataflow analysis 
+  - Assembly generation
 
 Far future
 ~~~~~~~~~~
