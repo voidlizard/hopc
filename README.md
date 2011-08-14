@@ -30,24 +30,21 @@ projects.
 If your share similar ideas and wish to contribute, I will very appreciated to any help 
 in the following directions:
 
-Typing
-++++++
+### Typing ###
 
 The H&M type inference is basically implemented, but so far is not used in the compiler.
 Also complex data types are waiting for implementation.
 
-Error handling
-++++++++++++++
+### Injecting Hoopl ###
+
+### Error handling ###
 
 The error handling is almost missed at the moment.
 
-Macro system
-++++++++++++
+### Macro system ###
 
 There is almost no any macro system or ideas how to implement it at the moment.
 
-Injecting Hoopl
-+++++++++++++++
 
 ROADMAP
 -------
