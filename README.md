@@ -10,7 +10,7 @@ Experimental Scheme-like compiled language
   - Erlang-style message-passing multitasking
   - Generally for embeded programming purposes
 
-Currently under hard development, this is even not an alpha version yet.
+Currently under heavy development, this is even not an alpha version yet.
 
 The nearest goal is to get compact, optimized as possible closure-converted
 C code to run on MSP430 MCU (16 bits, 55Kb ROM, 4 - 16 Kb of RAM)
