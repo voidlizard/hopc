@@ -73,11 +73,13 @@ FAQ
 
 
 Q: Why not to use LLVM?
+
 A: It's too complicated in it's backend aspects. It has a huge codebase. It takes a lot of time to get into it.
    But, there is no problems to use this compiler with LLVM as a backend. But this compiler is going to be
    small, simple and easy to hack and use
 
 Q: When it's going to be ready for production?
+
 A: I don't know. Personbally, I'm going to start to use it in production in Sep-2011
 
 
