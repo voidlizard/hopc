@@ -102,7 +102,7 @@ convert k = do
 
               let fn = lookup n fs
 
-              trace (printf "TRACE: KApp %s %s --- has entry %s (bind: %s) (fs: %s) " n (show args) (show fn) (show mb) (show fs)) $ return ()
+--              trace (printf "TRACE: KApp %s %s --- has entry %s (bind: %s) (fs: %s) " n (show args) (show fn) (show mb) (show fs)) $ return ()
 
               let nofree = not $ if isJust fn
                                     then hasFree (fromJust fn)
