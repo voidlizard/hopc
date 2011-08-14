@@ -34,3 +34,43 @@ dmz@x201:~/prj/hop$ cat  t/sloop3.hop
    (apply-closure main_3))
 
 ===================================================================================================
+
+FIXME: взаимная рекурсия опять
+
+cat t/trec1.hop 
+
+(define (boo x) (display x) (hoo x))
+
+(define (hoo a) (boo 22))
+
+
+(boo 16)
+
+--- уничтожилась hoo т.к использование переменной смотрится вниз, а не вверх
+
+
+(letrec ((fun_boo_0 (func (x_2 display
+                           hoo_1) (letrec ((_tmp0_3 (apply-closure display x_2)))
+                                     (apply-closure hoo_1 x_2))))
+         (boo_0 (make-closure fun_boo_0 display hoo_1)))
+   (let ((_tmp7_8 16))
+      (apply-closure boo_0 _tmp7_8)))
+
+
+---
+
+L0:                                        ; fun_boo_0
+          call r5                          ; call-closure
+          mov r1 r5                        ; ret. val.
+          call r6                          ; call-closure
+          mov r1 r6                        ; ret. val.
+          ret                              ; ret
+
+          nop                              ; make-closure
+          mov r5 r4                        ; fun_boo_0
+          const 16 r6                      ; 16 -> _tmp7_8
+          call r4                          ; call-closure
+          mov r1 r4                        ; ret. val.
+
+
+

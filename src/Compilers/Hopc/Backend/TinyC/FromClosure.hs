@@ -30,11 +30,11 @@ retvalReg = (R 1)
 
 convert  :: Closure -> CompileM IR
 convert k = trace "TRACE: FromClosure :: convert " $ do
-    
+
     v <- evalStateT (tr retvalReg k) init
 
     return $ IR v
-    
+
     where 
           tr :: R -> Closure -> ConvM [Instr]
 
@@ -99,7 +99,7 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
             return $ [opc (MOV r2 r1) (printf "%s -> %s" k n )]
 
           trB (n, e@(CFun (Fun fn args free k))) = do
-        
+ 
             fstart <- newlbl
             addFunLbl  n fstart 
 
@@ -110,7 +110,7 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
             (code, (Conv{lbl=nl})) <- lift $ flip runStateT newst $ do
                 mapM_ addReg (args ++ free)
                 tr retvalReg k
-            
+ 
             modify (\x -> x{lbl=nl})
 
             return $ opc (LABEL fstart) fn : code ++ [opc RET "ret"]
