@@ -35,26 +35,23 @@ import Text.PrettyPrint.HughesPJClass (prettyShow)
 main = do
     (x:_) <- getArgs
     input x $ \s -> do
-        st <- runCompile initCompile $ 
-                do liftIO $ putStrLn "PREVED FROM COMPILER MONAD"
+        st <- runCompile initCompile $ do
+               k <- parseTop s >>= K.kNormalizeTop >>= dump 
+                               >>= A.alphaConvM    >>= dump 
+                               >>= Cn.propagate
+                               >>= B.betaReduceM >>= dump 
+                               >>= L.flattenM
 
-                   k <- parseTop s >>= K.kNormalizeTop >>= dump 
-                                   >>= A.alphaConvM    >>= dump 
-                                   >>= Cn.propagate
-                                   >>= B.betaReduceM >>= dump 
-                                   >>= L.flattenM
-
-                   c1 <- C.convert k >>= E.eliminate
+               c1 <- C.convert k >>= E.eliminate
 
 
-                   liftIO $ putStrLn $ prettyShow c1 
+               liftIO $ putStrLn $ prettyShow c1 
 
-                   ir <- FC.convert c1
+               ir <- FC.convert c1
 
-                   liftIO $ putStrLn "\n\nTinyC\n" 
-                   liftIO $ putStrLn $ prettyShow ir
-                   liftIO $ putStrLn "\n" 
-
+               liftIO $ putStrLn "\n\nTinyC\n" 
+               liftIO $ putStrLn $ prettyShow ir
+               liftIO $ putStrLn "\n" 
 
         reportStatus st
 
