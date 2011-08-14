@@ -83,3 +83,10 @@ Q: When it's going to be ready for production?
 A: I don't know. Personbally, I'm going to start to use it in production in Sep-2011
 
 
+Q: Why Lisp syntax?
+
+A: It's most simplest and at the same time most powerful known syntax. I don't ready to invent 
+   any new syntax and definitelly I'm not ready to impement Haskell for microcontrollers. Anyway,
+   this syntax is just one of many possible frontends.
+
+
