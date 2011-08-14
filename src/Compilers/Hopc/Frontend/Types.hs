@@ -1,9 +1,10 @@
 {-# LANGUAGE EmptyDataDecls #-}
 module Compilers.Hopc.Frontend.Types where
 
+import Compilers.Hopc.Frontend.KTree (KId)
 import Compilers.Hopc.Typing.Types
 
-data TFunSpec = TFunSpec deriving (Eq, Show)
+data TFunSpec = TFunForeign KId | TFunLocal deriving (Eq, Show)
 
 data HType = TVar TypeId | TInt | TStr | TUnit | TFun TFunSpec [HType] HType
              deriving (Eq, Show)

@@ -1,0 +1,8 @@
+($ ccall "+" :int :int :int $)
+($ ccall "display" :string :unit $)
+
+
+(define (foo) display)
+
+((foo) "PREVED")
+

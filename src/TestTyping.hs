@@ -33,7 +33,7 @@ instance TType MType  where
 
 main = do
 --    let t1 = [(MVar "x", MInt), (MVar "y", MVar "x")] --, (MVar "z", MTuple [MVar "x", MVar "y"])]
-    let t1 = [(TVar "x", TFun TFunSpec [TVar "x1", TVar "x2"] (TVar "x3")), (TVar "x1", TInt), (TVar "x2", TStr)]
+    let t1 = [(TVar "x", TFun TFunLocal [TVar "x1", TVar "x2"] (TVar "x3")), (TVar "x1", TInt), (TVar "x2", TStr)]
     let t2 = I.infer t1
     print t2
 

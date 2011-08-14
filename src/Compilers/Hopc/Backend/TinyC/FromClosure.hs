@@ -3,6 +3,7 @@ module Compilers.Hopc.Backend.TinyC.FromClosure where
 import Prelude hiding (init)
 
 import Compilers.Hopc.Compile
+import Compilers.Hopc.Frontend.Types
 import Compilers.Hopc.Frontend.KTree (KId)
 import Compilers.Hopc.Frontend.Closure
 import Compilers.Hopc.Backend.TinyC.IR
@@ -56,9 +57,10 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
             return $ [opc (CALL r' "") ("call-closure")] ++ [opc (MOV retvalReg r) "ret. val."]
           
           tr r (CApplDir n args) = do
-            rs <- mapM getReg' args >>= return . unwords . ((:) n) .  map (maybe "r?" prettyShow)
-            l <- getFunLbl n
-            return $ [opc (CALL l "") rs] ++ [opc (MOV retvalReg r) (printf "retval -> %s" (prettyShow r))]
+            entry <- lift $ getEntry n
+            applDir r n args entry
+
+--            return $ [opc (CALL l "") rs] ++ [opc (MOV retvalReg r) (printf "retval -> %s" (prettyShow r))]
 
           tr r (CMakeCls n args) = do
             rr <- newreg
@@ -117,6 +119,17 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
 
 
           trB (n, e) = addReg n >>= flip tr e
+
+          applDir :: R -> KId -> [KId] -> Maybe Entry -> ConvM [Instr]
+          applDir r n args (Just (Entry (TFun (TFunForeign ffn) at rt))) = do
+            regs' <- mapM getReg' args
+            let regs = catMaybes regs'
+
+            -- TODO: regs <> args -> unknown var check
+            -- TODO: regs <> at   -> bad function call
+
+            l <- getFunLbl n
+            return $ [opc (CALL_FOREIGN ffn regs) ""] ++ [opc (MOV retvalReg r) (printf "retval -> %s" (prettyShow r))]
 
           addReg :: KId -> ConvM R
           addReg n = do

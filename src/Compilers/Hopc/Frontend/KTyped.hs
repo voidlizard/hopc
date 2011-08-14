@@ -23,7 +23,7 @@ typeOf (KLet _ _ e) = typeOf e
 
 typeOf (KLetR _ e)  = typeOf e
 
-typeOf (KLambda args e) = TFun TFunSpec (map TVar args) (typeOf e)
+typeOf (KLambda args e) = TFun TFunLocal (map TVar args) (typeOf e)
 
 typeOf (KInt _) = TInt
 

@@ -28,8 +28,8 @@ ccall :: [String] -> CompileM ()
 ccall (nm:l:args) = do
     let tx = map typeis (l:args)
     let rt = last tx
-    let at = tail tx
-    addEntry nm (TFun TFunSpec tx rt)   
+    let at = (reverse . tail . reverse) tx
+    addEntry nm (TFun (TFunForeign nm) at rt)
 
 ccall x = trace "TRACE: BAD C-CALL" $ return () -- raise warning?
 

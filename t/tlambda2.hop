@@ -1,4 +1,5 @@
 
+
 ($ ccall "+" :int :int :int $)
 ($ ccall "display" :string :unit $)
 
@@ -11,6 +12,6 @@
 ((foo) 22)
 
 
-(boo)
+((lambda () (boo)))
 
 

@@ -14,11 +14,11 @@ import Control.Monad.State
 import Control.Monad.Error
 import Control.Exception
 
-data Entry = Entry { eType :: HType } 
+data Entry = Entry { eType :: HType } deriving (Show)
 
 type Dict = M.Map KId Entry 
 
-data CompileState = CompileState Dict
+data CompileState = CompileState Dict deriving (Show)
 
 newtype CompileM a = CompileM {
     runT :: (StateT CompileState (ErrorT CompileError IO)) a

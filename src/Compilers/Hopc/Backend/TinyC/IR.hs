@@ -25,6 +25,7 @@ data Instr = I Op Desc
 
 data Op =   MOV   R R
           | CALL  LabelId LabelId
+          | CALL_FOREIGN LabelId [R]
           | CONST LabelId R
           | CJUMP JumpCnd LabelId
           | JUMP  LabelId
@@ -48,8 +49,8 @@ instance Pretty Instr where
                                                 $$ nest 32 (text " ;" <+> text dsc))
                                                 $+$ nest 0 (text "")
 
-    pPrintPrec l p (I op dsc)         = text "" 
-                                        $$ nest 10 (pPrintPrec l p op $$ nest 32 (text " ;" <+> text dsc))
+    pPrintPrec l p (I op dsc) = text "" 
+                                $$ nest 10 (pPrintPrec l p op $$ nest 32 (text " ;" <+> text dsc))
 
 instance Pretty R where
     pPrintPrec l p (R id) = text (printf "r%s" (show id))
@@ -60,6 +61,7 @@ instance Pretty JumpCnd where
 instance Pretty Op where
     pPrintPrec l p (MOV r1 r2)  = text "mov"     <+> (pPrintPrec l p r1) <+> (pPrintPrec l p r2)
     pPrintPrec l p (CALL l1 l2) = text "call"    <+> text l1
+    pPrintPrec l p (CALL_FOREIGN l1 r) = text "call-foreign" <+> text l1 <+> hcat (map (pPrintPrec l p) r)
     pPrintPrec l p (CONST l1 r) = text "const"   <+> text l1 <+> pPrintPrec l p r
     pPrintPrec l p (CJUMP c l1) = text "jmp-cnd" <+> (pPrintPrec l p c) <+> text l1
     pPrintPrec l p (JUMP l1)    = text "jmp"     <+> text l1
