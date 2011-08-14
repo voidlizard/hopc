@@ -24,7 +24,8 @@ Furthermore, I have just tired of writing code in C for embedded devices.
 Hopefully compact syntax and static typing will bring a lot of possibilities 
 of automatic static code analysis.
 
-This project is mostly inspired by BitC, PICBIT, Staapl, Embedded ML and MinCaml projects.
+This project is mostly inspired by BitC, PICBIT, Staapl, Embedded ML and MinCaml
+projects.
 
 If your share similar ideas and wish to contribute, I will very appreciated to any help 
 in the following directions:
@@ -48,7 +49,6 @@ There is almost no any macro system or ideas how to implement it at the moment.
 Injecting Hoopl
 +++++++++++++++
 
-
 ROADMAP
 -------
 
@@ -65,11 +65,23 @@ Beta release
 Nearest future
 ~~~~~~~~~~~~~~
 
-Use Hoopl for dataflow analysis 
-
+Using Hoopl for dataflow analysis 
 
 Far future
 ~~~~~~~~~~
 
 ???
+
+
+FAQ
+~~~
+
+Q: Why not to use LLVM?
+A: It's too complicated in it's backend aspects. It has a huge codebase. It takes a lot of time to get into it.
+   But, there is no problems to use this compiler with LLVM as a backend. But this compiler is going to be
+   small, simple and easy to hack and use
+
+Q: When it's going to be ready for production?
+A: I don't know. Personbally, I'm going to start to use it in production in Sep-2011
+
 
