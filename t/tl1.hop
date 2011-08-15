@@ -1,4 +1,7 @@
 
+($ ccall + :int :int :int $)
+($ ccall - :int :int :int $)
+
 (let ((f1 (lambda (a b)
 	 (let ((f2 (lambda (a b c) (+ a (- b c))))) 
 	 

@@ -14,4 +14,14 @@
 
 ((lambda () (boo)))
 
+;; (letrec ((fun_l_tmp5_8 (func (x_5) (let ((_tmp4_7 1))
+;;                                      (apply-direct + x_5 _tmp4_7))))
+;;         (fun_foo_2 (func () (make-closure fun_l_tmp5_8)))
+;;         (fun_boo_3 (func () (let ((_tmp7_9 "PING PONG"))
+;;                                (apply-direct display _tmp7_9))))
+;;         (fun__tmp12_12 (func () (apply-direct fun_boo_3)))
+;;         (_tmp8_4 (let ((_tmp9_10 (apply-direct fun_foo_2)))
+;;                     (let ((_tmp10_11 22))
+;;                        (apply-closure _tmp9_10 _tmp10_11)))))
+;;   (apply-direct fun__tmp12_12))
 

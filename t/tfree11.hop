@@ -1,0 +1,14 @@
+
+($ ccall random :int $)
+($ ccall display :int :unit $)
+
+
+(define x (random))
+
+(define (fx) (let ((y 22)) (let ((z 33) (m 77)) (begin (display x) (display y)))))
+
+(define (fy) (display x))
+
+(fx)
+(fy)
+

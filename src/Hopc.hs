@@ -5,6 +5,7 @@ import System.IO (stdin)
 import qualified Data.ByteString as BS
 
 import Data.Either
+import qualified Data.Map as M
 import Data.List
 import Control.Monad.Error
 import Compilers.Hopc.Frontend.Lisp.Parse
@@ -51,11 +52,15 @@ main = do
 
                addEntries (map (\(a,b) -> (typeid a, b)) constr')
 
+               ee <- getEntries
+--               let eee = M.toList ee
+               mapM_ (liftIO . print) (M.toList ee)
+
                k'' <- return k' >>= Cn.propagate
                                 >>= B.betaReduceM >>= dump
                                 >>= L.flattenM
 
-               c1 <- C.convert k'' >>= E.eliminate
+               c1 <- C.convert k'' -- >>= E.eliminate
 
                C.addTopLevelFunctions c1
 

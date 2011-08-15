@@ -1,0 +1,11 @@
+
+($ ccall random :int $)
+($ ccall display :int :unit $)
+
+
+(define x (random))
+
+(define (fx) (display x))
+
+(fx)
+
