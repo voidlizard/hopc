@@ -15,17 +15,18 @@ import qualified Compilers.Hopc.Frontend.BetaReduction as B
 import qualified Compilers.Hopc.Frontend.Const as Cn
 import qualified Compilers.Hopc.Frontend.LetFlatten as L
 import qualified Compilers.Hopc.Frontend.Closure as C
+import Compilers.Hopc.Frontend.Types
 import qualified Compilers.Hopc.Frontend.Eliminate as E
-import qualified Compilers.Hopc.Typing.Types as T
 import qualified Compilers.Hopc.Typing.Infer as I
+import Compilers.Hopc.Typing.Types
 
 import Compilers.Hopc.Backend.TinyC.IR
 import qualified Compilers.Hopc.Backend.TinyC.FromClosure as FC
 
 import Compilers.Hopc.Compile
+import Compilers.Hopc.Error
 
 import qualified Compilers.Hopc.Frontend.KTyped as KT
-import Compilers.Hopc.Frontend.Types
 
 --import Compilers.Hopc.Backend.DumbC
 import Debug.Trace
@@ -46,22 +47,17 @@ main = do
 
                dumpConstraints (Right constr)
 
-               let constr' = I.infer constr
+               constr' <- I.inferM constr
 
-               liftIO $ putStrLn "\n == unify ==\n"
+               addEntries (map (\(a,b) -> (typeid a, b)) constr')
 
-               dumpConstraints constr'
+               k'' <- return k' >>= Cn.propagate
+                                >>= B.betaReduceM >>= dump
+                                >>= L.flattenM
 
-               error "stop"
-
-               return k'       >>= Cn.propagate
-                               >>= B.betaReduceM >>= dump 
-                               >>= L.flattenM
-
-               c1 <- C.convert k >>= E.eliminate
+               c1 <- C.convert k'' >>= E.eliminate
 
                C.addTopLevelFunctions c1
---               c1 <- C.convert k -- >>= E.eliminate
 
                liftIO $ putStrLn $ prettyShow c1
 

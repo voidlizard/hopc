@@ -39,10 +39,20 @@ addEntry n t = do
     let d' = M.insert n (Entry {eType = t}) d
     put (CompileState d')
 
+addEntries :: [(KId, HType)] -> CompileM ()
+addEntries ls = do
+    let dict = M.fromList (map (\(a, b) -> (a, Entry b)) ls)
+    modify ( \(CompileState d) -> CompileState (M.union d dict))
+
 getEntry :: KId -> CompileM (Maybe Entry)
 getEntry n = do
     (CompileState d) <- get
     return $ M.lookup n d
+
+getEntryType :: KId -> CompileM (Maybe HType)
+getEntryType n = do
+    e <- getEntry n
+    return $ maybe Nothing (Just . eType) e
 
 getEntries :: CompileM (M.Map KId HType)
 getEntries = do 

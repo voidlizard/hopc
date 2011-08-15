@@ -1,10 +1,13 @@
 module Compilers.Hopc.Typing.Infer where
 
+import Compilers.Hopc.Compile
+import Compilers.Hopc.Error
 import Compilers.Hopc.Typing.Types
 
 import Data.Maybe
 import Data.Either
 import Control.Monad
+import Control.Monad.Error
 
 data InferError a = Occurs a a | NotMatch a a deriving (Show)
 
@@ -23,6 +26,12 @@ let unify constr =
        in uni constr |> uni
 
 -}
+
+inferM :: (Eq a, TType a) => [(a, a)] -> CompileM [(a, a)]
+inferM constr = withError $ infer constr
+    where withError (Right x) = return x
+          withError (Left _)  = throwError TypingError -- FIXME: more error handling
+
 
 infer :: (Eq a, TType a) => [(a, a)] -> Either (InferError a) [(a, a)]
 infer = uni . unify 

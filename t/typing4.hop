@@ -1,0 +1,5 @@
+
+($ ccall eq :int :int :bool $)
+
+(if (eq 1 1) "JOPA" 111)
+

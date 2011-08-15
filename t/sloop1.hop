@@ -5,7 +5,7 @@
 ($ ccall "putint"   :int :unit $)
 ($ ccall "random"   :int $)
 ($ ccall "-" :int :int :int $)
-($ ccall ">" :int :int :int $)
+($ ccall ">" :int :int :bool $)
 
 (let ((x (random))
       (main (lambda (y) (begin (display "PIU ") (putint x) (newline) (if (> y 0) (main (- y 1)) 0 ) ) ;; 

@@ -1,0 +1,10 @@
+
+($ ccall + :int :int :int $)
+
+(define (plus) +)
+
+
+(plus 1 2)
+
+
+

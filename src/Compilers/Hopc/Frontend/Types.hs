@@ -13,6 +13,9 @@ data HType = TVar TypeId | TInt | TStr | TBool | TUnit | TFun TFunSpec [HType] H
              deriving (Eq, Show)
 
 
+
+--instance Compilers
+
 instance TType HType  where
 
     occurs t (TFun _ args r) = occursList t args && occurs t r
@@ -39,4 +42,11 @@ instance TType HType  where
     typeid (TVar  s)  = s
     typeid (TAppl s)  = s
     typeid x         = "unknown"
+
+
+isVarT :: HType -> Bool
+isVarT (TVar _) = True
+isVarT (TAppl _) = True
+isVarT (TFun _ a b) = foldl (||) False $ map isVarT (b:a)
+isVarT x = False
 

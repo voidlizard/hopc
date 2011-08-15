@@ -64,6 +64,9 @@ convert :: KTree -> CompileM Closure
 convert k = do
     (cls, s) <- runStateT (conv k) convInit
     let binds = bindsOfCls cls
+
+    trace ("TRACE: convert 111 " ++ (show binds)) $ return ()
+
     return $ convDirectCls $ CLetR (map bindsOfFn (fns s) ++ binds) (cOfCls cls)
     where bindsOfCls (CLet n e1 e2) = [(n, e1)]
           bindsOfCls (CLetR binds e2) = binds
@@ -79,7 +82,10 @@ convert k = do
           conv (KInt n) = return $ CInt n
           conv (KStr s) = return $ CStr s
 
-          conv (KVar n) = return $ CVar n
+          conv (KVar n) = do  --return $ CVar n
+            tp <- lift $ getEntryType n
+            trace ("TRACE: conv (KVar _) " ++ n ++ " " ++ (show tp)) $ return ()
+            convVar n tp
 
           conv (KLet n e1 e2) = do
               (n', e1') <- convBind (n, e1)
@@ -121,6 +127,14 @@ convert k = do
 
           conv wtf = error $ "WTF? " ++ show wtf
 
+--          convVar n (TFun _ a r)  = 
+          convVar n (Just v@(TFun TFunLocal _ _)) | (not.isVarT) v = return $ CMakeCls (fname n) [] --  error "GOT FUNCTION"
+          convVar n (Just v@(TFun (TFunForeign _) _ _)) | (not.isVarT) v = return $ CMakeCls n [] --  error "GOT FUNCTION"
+          convVar n (Just x) | (not.isVarT) x = return $ CVar n -- error $ "GOT WTF " ++ n ++ " " ++ (show x)
+          convVar n x = error $ "GOT VARIABLE OF UNKNOWN TYPE " ++ n ++ " " ++ (show x) -- FIXME
+          
+--          convVar n (Just (TVar _)  = error "UNDEFINED TYPE"
+
           convBind (n, e@(KLambda argz eb)) = trace (printf "TRACE: convBind %s" n) $ do
               setbind n
               globs <- gs
@@ -142,6 +156,10 @@ convert k = do
               free <- fv eb'
 
               addFun n argz free eb'
+
+              ft <- lift $ getEntry n
+
+              trace ("TRACE: addFun : " ++ n ++  " " ++ (show ft)) $ return ()
 
               when (free /= []) $ do --- FIXME: real perversion: fix function body
                 eb'' <- conv eb -- >>= lift . eliminate
