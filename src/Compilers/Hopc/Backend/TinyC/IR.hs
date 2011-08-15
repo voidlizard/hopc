@@ -27,6 +27,7 @@ data Op =   MOV   R R
           | CALL  LabelId LabelId
           | CALL_FOREIGN LabelId [R]
           | CALL_LOCAL   LabelId [R]
+          | CALL_CLOSURE R [R]
           | CONST LabelId R
           | CJUMP JumpCnd LabelId
           | JUMP  LabelId
@@ -64,6 +65,7 @@ instance Pretty Op where
     pPrintPrec l p (CALL l1 l2) = text "call"    <+> text l1
     pPrintPrec l p (CALL_FOREIGN l1 r) = text "call-foreign" <+> text l1 <+> fsep (map (pPrintPrec l p) r)
     pPrintPrec l p (CALL_LOCAL l1 r) = text "call-local" <+> text l1 <+> fsep (map (pPrintPrec l p) r)
+    pPrintPrec l p (CALL_CLOSURE r rs) = text "call-closure" <+> pPrintPrec l p r <+> fsep (map (pPrintPrec l p) rs)
     pPrintPrec l p (CONST l1 r) = text "const"   <+> text l1 <+> pPrintPrec l p r
     pPrintPrec l p (CJUMP c l1) = text "jmp-cnd" <+> (pPrintPrec l p c) <+> text l1
     pPrintPrec l p (JUMP l1)    = text "jmp"     <+> text l1

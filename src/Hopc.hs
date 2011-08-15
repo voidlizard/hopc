@@ -36,9 +36,18 @@ main = do
     (x:_) <- getArgs
     input x $ \s -> do
         st <- runCompile initCompile $ do
-               k <- parseTop s >>= K.kNormalizeTop >>= dump 
-                               >>= A.alphaConvM    >>= dump 
-                               >>= Cn.propagate
+               k <- parseTop s >>= K.kNormalizeTop -- >>= dump 
+--                               >>= A.alphaConvM    >>= dump
+
+
+               k' <- A.alphaConvM k >>= dump
+
+               constr <- KT.constraints k'
+               dumpConstraints constr
+
+--               error "stop"
+
+               return k'       >>= Cn.propagate
                                >>= B.betaReduceM >>= dump 
                                >>= L.flattenM
 
@@ -60,6 +69,7 @@ main = do
     where input "-" fn = BS.hGetContents stdin >>= fn
           input x fn = BS.readFile x >>= fn
 
+dumpConstraints x = trace ("TRACE: constraints \n" ++ intercalate "\n" (map show x) ++ "\n") $ return x 
 
 dump x = liftIO $ putStrLn (prettyShow x) >> return x
 

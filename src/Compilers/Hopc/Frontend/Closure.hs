@@ -129,7 +129,7 @@ convert k = do
 
               let fset = S.difference (S.fromList r) (S.fromList (n : l ++ argz) `S.union` globs)
               let rset = S.fromList r
-             
+
               addFun n argz [] (CUnit) -- FIXME: function's dummy. what a perversion...
 
               eb'  <- conv eb -- >>= lift . eliminate

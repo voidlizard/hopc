@@ -1,0 +1,11 @@
+
+($ ccall display :string :unit $)
+
+(define (qq s) (display s))
+
+(define (wtf s) (qq s))
+
+
+(wtf "QQQQ")
+
+

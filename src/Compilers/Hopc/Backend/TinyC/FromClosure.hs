@@ -52,9 +52,14 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
           tr r (CApplCls n args) = do
             rs <- mapM getReg' args >>= return . unwords . ((:) n) .  map (maybe "r?" prettyShow)
 --            l <- getFunLbl n
+
+            regs <- getRegList args 
+
+            -- TODO: regs <> args -> unknown var check
+            -- TODO: regs <> at   -> bad function call
+
             r <- getReg n  -- TODO: CALL-CLOSURE
-            let r' = prettyShow r
-            return $ [opc (CALL r' "") ("call-closure")] ++ mov retvalReg r "ret. val."
+            return $ [opc (CALL_CLOSURE r regs) ("call-closure")] ++ mov retvalReg r "ret. val."
           
           tr r (CApplDir n args) = do
             entry <- lift $ getEntry n
@@ -66,6 +71,8 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
 
           tr r (CVar n) = do
             r2 <- getReg n
+            trace ("TRACE: WTF? " ++ n) $ return () --- FIXME: CHECK FOR CLOSURE?
+            error "I'm so sorry, but u need typing here"
             return $ mov r2 r (printf "%s -> %s" n (prettyShow r))
 
           tr r (CCond n e1 e2) = do
@@ -73,7 +80,7 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
             c2 <- tr r e2
             r  <- getReg n
 
-            l1 <- newlbl 
+            l1 <- newlbl
             l3 <- newlbl
 
             let ll1 = LABEL l1
@@ -89,6 +96,7 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
 
           tr r1 (CVar k) = do
             r2 <- getReg k
+            trace ("TRACE: WTF? " ++ k) $ return ()
             return $ mov r2 r1 ""
 
           tr r x = return $ [opc NOP $"unsupported " ++ (prettyShow x)]
@@ -187,7 +195,7 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
           init  = Conv {regno = 3, lbl = 0, regmap = M.empty, funlbl = M.empty} -- FIXME: remove the hardcode
 
 
-mov (R a) (R b) dsc | a == b = []
-mov a b dsc = [opc (MOV a b) dsc]
+          mov (R a) (R b) dsc | a == b = []
+          mov a b dsc = [opc (MOV a b) dsc]
 
 

@@ -1,0 +1,7 @@
+
+($ ccall display :string :unit $)
+
+(define (qq) display)
+
+((qq) "QQQQ")
+

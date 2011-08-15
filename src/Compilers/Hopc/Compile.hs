@@ -44,6 +44,11 @@ getEntry n = do
     (CompileState d) <- get
     return $ M.lookup n d
 
+getEntries :: CompileM (M.Map KId HType)
+getEntries = do 
+    (CompileState d) <- get
+    return $ M.map eType d
+
 names :: CompileM (S.Set KId)
 names = do
     (CompileState d) <- get
