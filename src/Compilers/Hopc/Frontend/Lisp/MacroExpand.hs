@@ -36,6 +36,7 @@ ccall x = trace "TRACE: BAD C-CALL" $ return () -- raise warning?
 typeis ":int"    = TInt
 typeis ":string" = TStr
 typeis ":unit"   = TUnit
+typeis ":bool"   = TBool
 typeis x         = TVar x
 
 atom (EAtom (AtomT (_, bs))) = toString bs

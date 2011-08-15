@@ -1,0 +1,10 @@
+
+($ ccall "+"   :int :int :int $)
+($ ccall "eq"  :int :int :bool $)
+
+(define (t1 a) (if (eq a 1) 1 2) )
+
+(t1 2)
+
+
+

@@ -43,9 +43,16 @@ main = do
                k' <- A.alphaConvM k >>= dump
 
                constr <- KT.constraints k'
-               dumpConstraints constr
 
---               error "stop"
+               dumpConstraints (Right constr)
+
+               let constr' = I.infer constr
+
+               liftIO $ putStrLn "\n == unify ==\n"
+
+               dumpConstraints constr'
+
+               error "stop"
 
                return k'       >>= Cn.propagate
                                >>= B.betaReduceM >>= dump 
@@ -69,7 +76,8 @@ main = do
     where input "-" fn = BS.hGetContents stdin >>= fn
           input x fn = BS.readFile x >>= fn
 
-dumpConstraints x = trace ("TRACE: constraints \n" ++ intercalate "\n" (map show x) ++ "\n") $ return x 
+dumpConstraints (Right x) = trace ("TRACE: constraints PIU PIU \n" ++ intercalate "\n" (map show x) ++ "\n") $ return x 
+dumpConstraints (Left _) = error "Type infer error"
 
 dump x = liftIO $ putStrLn (prettyShow x) >> return x
 

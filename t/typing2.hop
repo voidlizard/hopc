@@ -1,0 +1,12 @@
+
+($ ccall "+" :int :int :int $)
+
+(define (plus a b) (+ a b))
+
+(define (q) plus)
+
+(define (qq) q)
+
+( ((qq)) a b)
+
+

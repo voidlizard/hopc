@@ -22,11 +22,7 @@ constraints k = do
    
     dict <- getEntries
     c <- evalStateT (mapM constr (universe k)) (init dict)
-
-    trace ("TRACE: constraints \n" ++ intercalate "\n" (map show c)) $ return ()
-
-    error "STOP"
---    return $ concat c 
+    return $ concat c 
 
     where constr :: KTree -> KTypedM [(HType, HType)]
 
@@ -45,15 +41,22 @@ constraints k = do
             forM_ args $ \n -> trace ("TRACE: constr mem " ++ (show n)) $ mem n (TVar n)
             return []
 
+          constr (KApp n e) = do
+            fn <- remem' n
+            trace ("TRACE: KApp " ++ (show e)) $ return ()
+            wtf <- get
+            case fn of
+                Just (TFun _ at rt) -> return $ zipWith (\a b -> (TVar a, b)) e at
+                Just x -> return [] -- error $ "NOT APPLICABLE " ++ show x ++ "\n" ++ intercalate "\n" (map show (M.toList wtf))
+                Nothing -> return []
+
+          constr (KCond n e1 e2) = do
+            t1 <- remem n
+            t2 <- typeOf e1
+            t3 <- typeOf e2
+            return $ [ (t1, TBool), (t2, t3) ]
+
           constr x = return []
-
---          tp :: KTree -> KTypedM KTree
---          tp x@(KLet n e1 e2) = undefined -- return $ tpB (n, x) : concat r
---          tp x@(KLetR bs e) = undefined -- return $ map tpB bs ++ concat r
---          tp x@(KApp n args)  = undefined -- return $ concat r -- undefined
---          tp x = undefined -- return $ concat r
-
---          tpB (n, x) = undefined -- return $ (TVar n, typeOf x)
 
           init x = x
 
@@ -90,9 +93,11 @@ constraints k = do
 
             tp <- remem' n
             return $ case tp of
-                        Nothing -> TVar (n ++ "_fake")-- error $ "WTF? UNKNOWN TYPE FOR " ++ n -- FIXME: error handling
+                        Nothing -> TAppl n
                         Just (TFun _ _ rt)  -> rt
                         x       -> error $ "NOT APPLICABLE  "  ++ n
+
+          typeOf (KCond _ e1 e2) = typeOf e1 
 
           typeOf x = error ("oops " ++ show x)
 
