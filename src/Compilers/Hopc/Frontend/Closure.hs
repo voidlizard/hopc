@@ -105,8 +105,6 @@ conv2 k = do
 
     let bs = [(fn, p) | (CFun p@(Fun fn args free b)) <- universe cl'']
 
-
-
     liftIO $ print rl'
 
     entries <- getEntries
