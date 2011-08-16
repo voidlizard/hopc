@@ -14,7 +14,7 @@ import Control.Monad.State
 import Control.Monad.Error
 import Control.Exception
 
-data Entry = Entry { eType :: HType } deriving (Show)
+data Entry = Entry { eType :: HType, eTop :: Bool } deriving (Show)
 
 type Dict = M.Map KId Entry 
 
@@ -33,15 +33,15 @@ runCompile init f = runErrorT (runStateT (runT f) init)
 
 initCompile = CompileState M.empty
 
-addEntry :: KId -> HType -> CompileM ()
-addEntry n t = do 
+addEntry :: Bool -> KId -> HType -> CompileM ()
+addEntry tp n t = do 
     (CompileState d) <- get
-    let d' = M.insert n (Entry {eType = t}) d
+    let d' = M.insert n (Entry {eType = t, eTop = tp}) d
     put (CompileState d')
 
-addEntries :: [(KId, HType)] -> CompileM ()
-addEntries ls = do
-    let dict = M.fromList (map (\(a, b) -> (a, Entry b)) ls)
+addEntries :: Bool -> [(KId, HType)] -> CompileM ()
+addEntries t ls = do
+    let dict = M.fromList (map (\(a, b) -> (a, Entry b t)) ls)
     modify ( \(CompileState d) -> CompileState (M.union d dict))
 
 getEntry :: KId -> CompileM (Maybe Entry)
@@ -58,6 +58,12 @@ getEntries :: CompileM (M.Map KId HType)
 getEntries = do 
     (CompileState d) <- get
     return $ M.map eType d
+
+
+entryList :: CompileM [(KId,Entry)]
+entryList = do 
+    (CompileState d) <- get
+    return $ M.toList d
 
 names :: CompileM (S.Set KId)
 names = do

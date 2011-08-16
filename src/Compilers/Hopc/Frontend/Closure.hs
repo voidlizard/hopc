@@ -1,5 +1,5 @@
 {-# LANGUAGE EmptyDataDecls, DeriveDataTypeable #-}
-module Compilers.Hopc.Frontend.Closure (convert, Closure(..), Fun(..), eliminate, addTopLevelFunctions)
+module Compilers.Hopc.Frontend.Closure (convert, Closure(..), Fun(..), eliminate, addTopLevelFunctions, conv2)
                                         where
 
 import qualified Data.Map as M
@@ -7,7 +7,6 @@ import qualified Data.Set as S
 import Data.List
 import Data.Maybe
 import Data.Either
---import Control.Monad.Maybe
 import Control.Monad.State
 import Control.Monad.Trans
 import Control.Monad.Error
@@ -47,20 +46,152 @@ type ConvM = StateT Conv CompileM
 
 
 addTopLevelFunctions :: Closure -> CompileM ()
+addTopLevelFunctions = undefined 
 
-addTopLevelFunctions (CLetR binds _) = mapM_ addFnEntry $ foldl bind [] binds
-    where bind acc (_,(CFun f)) = f:acc
-          bind acc _            = acc
+--addTopLevelFunctions (CLetR binds _) = mapM_ addFnEntry $ foldl bind [] binds
+--    where bind acc (_,(CFun f)) = f:acc
+--          bind acc _            = acc
 
-addTopLevelFunctions (CLet n (CFun f) _) = addFnEntry f
+--addTopLevelFunctions (CLet n (CFun f) _) = addFnEntry f
 
-addTopLevelFunctions x = return ()
+--addTopLevelFunctions x = return ()
 
-addFnEntry (Fun fn args free _) = do
-    -- TODO: type inference ?? Where?? When?
-    let vars = map TVar (args ++ free)
-    let func = TFun TFunLocal vars (TVar ("tret_" ++ fn))
-    addEntry fn func
+--addFnEntry (Fun fn args free _) = do
+--     TODO: type inference ?? Where?? When?
+--    let vars = map TVar (args ++ free)
+--    let func = TFun TFunLocal vars (TVar ("tret_" ++ fn))
+--    addEntry fn func
+
+data C2 = C2 { cfn :: M.Map KId KTree, cseen :: M.Map KId (S.Set KId), cfree :: M.Map KId [KId] }
+data C3 = C3 { fv :: KId -> [KId], isglob :: KId -> Bool, fbind :: KId -> Maybe Fun, rn :: KId -> KId }
+
+type C2M = StateT C2 CompileM
+type C4M = StateT (M.Map KId KId) CompileM
+
+conv2 :: KTree -> CompileM Closure
+conv2 k = do
+    (v,s) <- runStateT (p k) init
+    entries <- entryList 
+    let e = [ x | x@(n, (Entry t tp)) <- entries, tp == True]
+    let glob = S.fromList (map fst e)
+
+    fv <- forM (M.toList (cfn s)) $ \(n, l@(KLambda args b)) -> do
+        let f = S.toList $ S.difference (S.fromList (free n l)) glob
+        return (n, f)
+
+    let finit@(C2{cfree = fs}) = initf init (M.fromList fv)
+
+    let f n = maybe [] id (M.lookup n fs)
+    let g n = S.member n glob
+
+    q <- forM (M.toList (cfn s)) $ \(n, l@(KLambda args b)) -> do
+        (b, s) <- runStateT (p b) $ finit 
+        let fn = CFun (Fun (fname n) args (f n) b)
+        return (fname n, fn)
+
+    let bmap = M.fromList q
+
+    liftIO $ putStrLn " -== "
+    forM_ (M.toList bmap) $ liftIO . print
+    liftIO $ putStrLn " -== "
+--    trace (show bmap) $ return ()
+
+    let fb n = maybe Nothing (\(CFun f) -> Just f) (M.lookup n bmap)
+
+    let cl = addFns v q
+
+    let bs = [n | (CMakeCls n args) <- universe cl]
+    let rl = M.fromList $ map (\a -> (a, fname a)) $ S.toList $ S.fromList bs `S.difference` glob
+
+    let rn  n = maybe n id (M.lookup n rl)
+
+    liftIO $ putStrLn "------ GLOB ----------"
+    forM_ (S.toList glob) $ liftIO . print
+    liftIO $ putStrLn "------ REPL ----------"
+    forM_ (M.toList rl) $ liftIO . print
+    liftIO $ putStrLn "----------------------"
+
+    (cl', s) <- runStateT (rewriteBiM (r (C3 f g fb rn)) cl) (M.empty)
+
+    forM_ (M.toList s) $ liftIO . print
+
+    return cl'
+
+    where 
+          p :: KTree -> C2M Closure
+          p (KLet  n e e1) = liftM2 (CLet n) (liftM snd (pb (n,e))) (p e1)     -- undefined --CLet n ((snd.pb) (n,e)) (p e1)
+          p (KLetR b e1)   = liftM2 CLetR (mapM pb b) (p e1)  -- undefined -- mapM_ pb b >>= \x -> CLetR  x >>= undefined --CUnit -- >> undefined --CLetR (map pb b) (p e1)
+          p (KVar n) = lift (getEntryType n) >>= cvar n 
+          p (KInt v) = return $ CInt v
+          p (KStr s) = return $ CStr s
+          p (KCond n e1 e2) = liftM2 (CCond n) (p e1) (p e2) -- undefined -- return $ CCond n (p e1) (p e2)
+          p (KUnit) = return $ CUnit
+          p (KApp n e) = return $ CApplCls n e
+          p x = error $ "unexpected " ++ (show x) -- FIXME: compiler error
+          pb (n, l@(KLambda a e)) = pl n l >> p e >> clos n >>= return . ((,) n)
+          pb (n, x) = p x >>= return . ((,) n)
+          pl n l = do
+            st@(C2 {cfn = f}) <- get
+            put st {cfn = M.insert n l f}
+
+          cvar :: KId -> Maybe HType -> C2M Closure 
+          cvar n (Just (TFun _ _ _)) = return $ CMakeCls n []
+          cvar n (Just _) = return $ CVar n
+          cvar n Nothing = lift $ throwError TypingError -- FIXME: more information
+
+          clos n = do
+            fv <- gets (M.lookup n . cfree)
+            case fv of
+                Nothing -> return $ CMakeCls n []
+                Just [] -> return $ CMakeCls n []
+                Just x  -> return $ CMakeCls n x 
+
+          fl (KLambda _ _) r = [] 
+          fl (KVar n )     r = concat r ++ [Right n]
+          fl (KApp n _)    r = concat r ++ [Right n]
+          fl (KLet n _ _)  r = concat r ++ [Left n]
+          fl (KCond n _ _) r = concat r ++ [Right n]
+          fl (KLetR bs _)  r = concat r ++ map (Left . fst) bs
+          fl x r             = concat r
+
+          free n (KLambda args b) = 
+             let (l, r) = partitionEithers $ para fl b
+                 fset = S.fromList r `S.difference` S.fromList (n:l ++ args)
+             in S.toList fset
+
+          free n x = []
+
+          r :: C3 -> Closure -> C4M (Maybe Closure)
+
+          r c (CApplCls n args) | ((isglob c) n) =
+            return $ Just $ CApplDir n args
+ 
+          r c (CApplCls n args) | (not.(isglob c)) n && ((fv c) n == []) =
+            return $ Just $ CApplDir ((rn c) n) args
+
+          r c (CMakeCls n args) | ((rn c) n) == n = return Nothing
+          r c (CMakeCls n args)  = rbind n ((fbind c) ((rn c) n))
+
+          r c x = return Nothing
+
+          rbind n Nothing = return Nothing 
+
+          rbind n (Just p@(Fun fn a f r)) = do
+            return $ Just $ CMakeCls fn f
+
+          addFns (CLet n c c2) q = CLetR (q ++ [(n, c)]) c2
+          addFns (CLetR b c2)  q = CLetR (b ++ q) c2
+
+          init = C2 M.empty M.empty M.empty
+          initf v@(C2 {cfree = fr}) f = v {cfree = f}
+
+
+--    [KLetR]
+
+-- evalState ( rewriteBiM tr k ) 0
+--    where tr (KLambda n 
+
+
 
 convert :: KTree -> CompileM Closure
 convert k = do
@@ -344,8 +475,7 @@ instance Pretty Closure where
     pPrintPrec _ _ (CInt n) = integer n
     pPrintPrec _ _ (CStr s) = (text.show) s
     pPrintPrec _ _ (CVar v) = text v
-    pPrintPrec l p (CFun (Fun n args free e)) = prettyParen True $ text "func"
-                                                <+> (prettyParen True (fsep $ map text (args++free) ))
+    pPrintPrec l p (CFun (Fun n args free e)) = prettyParen True $ text "func" <+> prettyParen True (text n <+> (fsep $ map text (args++free)))
                                                 <+> pPrintPrec l p e
     pPrintPrec l p (CApplCls n a) = prettyParen True $ text "apply-closure" <+> text n <+> ( fsep $ map text a )
     pPrintPrec l p (CApplDir n a) = prettyParen True $ text "apply-direct" <+> text n <+> ( fsep $ map text a )

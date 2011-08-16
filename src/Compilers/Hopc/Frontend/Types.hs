@@ -18,7 +18,7 @@ data HType = TVar TypeId | TInt | TStr | TBool | TUnit | TFun TFunSpec [HType] H
 
 instance TType HType  where
 
-    occurs t (TFun _ args r) = occursList t args && occurs t r
+    occurs t p@(TFun _ args r) = occursList t (r:args)
     occurs r (TAppl s) = r == s
     occurs t x = False
 
@@ -29,7 +29,7 @@ instance TType HType  where
 
     subst ta a x = x
 
-    isVar (TAppl _) = False 
+    isVar (TAppl _) = True 
     isVar (TVar _)  = True 
     isVar x         = False
 

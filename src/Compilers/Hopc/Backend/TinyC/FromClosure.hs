@@ -126,7 +126,7 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
 
           applDir :: R -> KId -> [KId] -> Maybe Entry -> ConvM [Instr]
 
-          applDir r n args (Just (Entry (TFun (TFunForeign ffn) at rt))) = do
+          applDir r n args (Just (Entry (TFun (TFunForeign ffn) at rt) tp)) = do
             regs <- getRegList args 
 
             -- TODO: regs <> args -> unknown var check
@@ -134,7 +134,7 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
 
             return $ [opc (CALL_FOREIGN ffn regs) ""] ++ mov retvalReg r (printf "retval -> %s" (prettyShow r)) -- TODO: remove boilerplat
 
-          applDir r n args (Just (Entry (TFun (TFunLocal) at rt))) = do
+          applDir r n args (Just (Entry (TFun (TFunLocal) at rt) tp)) = do
             regs <- getRegList args
             l <- getFunLbl n
 

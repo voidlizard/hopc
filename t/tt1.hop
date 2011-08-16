@@ -1,7 +1,9 @@
 
-(define (qq z) (display z))
+($ ccall + :int :int :int $)
 
-(let (x 1) x)
+(define (plus a b) (+ a b))
 
-(let (fn qq) (fn "JOPA"))
+(define (q) plus)
+
+(q 1 2)
 

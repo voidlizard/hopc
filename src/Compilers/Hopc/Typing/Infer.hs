@@ -7,7 +7,10 @@ import Compilers.Hopc.Typing.Types
 import Data.Maybe
 import Data.Either
 import Control.Monad
+
 import Control.Monad.Error
+
+import Debug.Trace
 
 data InferError a = Occurs a a | NotMatch a a deriving (Show)
 
@@ -44,7 +47,7 @@ uni :: (Eq a, TType a) => Either (InferError a) [(a, a)] -> Either (InferError a
 uni (Right []) = Right []
 uni (Right ((a,b):rs)) | a == b = uni $ Right rs
                        | isVar a = if occurs (typeid a) b 
-                                     then Left (Occurs a b) 
+                                     then Left (Occurs a b)
                                      else result (a, b) (uni $ Right $ map (sub (typeid a) b) rs)
                        | (not.isVar) a && isVar b = uni $ Right ((b,a):rs)
                        | otherwise = case merge a b of

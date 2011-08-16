@@ -50,19 +50,20 @@ main = do
 
                constr' <- I.inferM constr
 
-               addEntries (map (\(a,b) -> (typeid a, b)) constr')
+               addEntries False (map (\(a,b) -> (typeid a, b)) constr')
 
                ee <- getEntries
 --               let eee = M.toList ee
                mapM_ (liftIO . print) (M.toList ee)
 
                k'' <- return k' >>= Cn.propagate
-                                >>= B.betaReduceM >>= dump
+                                >>= B.betaReduceM
                                 >>= L.flattenM
 
-               c1 <- C.convert k'' -- >>= E.eliminate
+--               c1 <- C.convert k'' -- >>= E.eliminate
+               c1 <- C.conv2 k'' -- >>= E.eliminate
 
-               C.addTopLevelFunctions c1
+--               C.addTopLevelFunctions c1
 
                liftIO $ putStrLn $ prettyShow c1
 
