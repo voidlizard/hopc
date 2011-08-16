@@ -1,5 +1,5 @@
 {-# LANGUAGE EmptyDataDecls, DeriveDataTypeable #-}
-module Compilers.Hopc.Frontend.Closure (convert, Closure(..), Fun(..), eliminate, addTopLevelFunctions, conv2)
+module Compilers.Hopc.Frontend.Closure (convert, Closure(..), Fun(..), eliminate, conv2)
                                         where
 
 import qualified Data.Map as M
@@ -44,9 +44,8 @@ data Conv = Conv { fns :: [(KId, Fun)], cbind :: Maybe KId, cknown :: S.Set KId 
 
 type ConvM = StateT Conv CompileM
 
-
-addTopLevelFunctions :: Closure -> CompileM ()
-addTopLevelFunctions = undefined 
+--addTopLevelFunctions :: Closure -> CompileM ()
+--addTopLevelFunctions = undefined 
 
 --addTopLevelFunctions (CLetR binds _) = mapM_ addFnEntry $ foldl bind [] binds
 --    where bind acc (_,(CFun f)) = f:acc
@@ -94,7 +93,6 @@ conv2 k = do
     liftIO $ putStrLn " -== "
     forM_ (M.toList bmap) $ liftIO . print
     liftIO $ putStrLn " -== "
---    trace (show bmap) $ return ()
 
     let fb n = maybe Nothing (\(CFun f) -> Just f) (M.lookup n bmap)
 
@@ -105,17 +103,48 @@ conv2 k = do
 
     let rn  n = maybe n id (M.lookup n rl)
 
-    liftIO $ putStrLn "------ GLOB ----------"
-    forM_ (S.toList glob) $ liftIO . print
-    liftIO $ putStrLn "------ REPL ----------"
-    forM_ (M.toList rl) $ liftIO . print
-    liftIO $ putStrLn "----------------------"
-
     (cl', s) <- runStateT (rewriteBiM (r (C3 f g fb rn)) cl) (M.empty)
 
-    forM_ (M.toList s) $ liftIO . print
+    let fs2 = M.fromList $ [(f, p) | CFun p@(Fun f args free bdy) <- universe cl']
+    let f2  n = maybe [] (\(Fun _ _ f _) -> f) (M.lookup n fs2)
+    let fb2 n = M.lookup n fs2
 
-    return cl'
+    (cl'', s) <- runStateT (rewriteBiM (r (C3 f2 g fb2 rn)) cl') (M.empty)
+
+    let bs = [(fn, p) | (CFun p@(Fun fn args free b)) <- universe cl'']
+
+    let rl' = M.fromList $ map (\(a,b) -> (b,a)) $ M.toList rl
+
+    liftIO $ print rl'
+
+    entries <- getEntries
+
+    forM_ bs $ \(fn, (Fun _ args free b)) -> do
+        let nm =  M.lookup fn rl'
+        when ((not.isJust) nm) $ error "COMPILER ERROR" -- FIXME
+        let n = fromJust nm
+
+        let tn' = M.lookup n entries
+        let tf' = map (flip M.lookup entries) free
+        let tf = catMaybes tf'
+
+        when ((not.isJust) tn') $ error "COMPILER ERROR / TYPE ERROR" -- FIXME
+
+        let tn = fromJust tn'
+
+        when (length tf /= length free) $ error "COMPILER ERROR / TYPE ERROR" -- FIXME
+
+        nf <- case tn of
+               (TFun spec args rt) -> return $ TFun spec (args ++ tf) rt
+               _                   -> error $ "COMPILER ERROR / TYPE ERROR [CALL OF NOT APPLICABLE] " ++ n
+
+        addEntry False fn nf 
+
+        liftIO $ print (tn : tf)
+
+    liftIO $ putStrLn "DONE"
+
+    return cl''
 
     where 
           p :: KTree -> C2M Closure
@@ -169,8 +198,23 @@ conv2 k = do
           r c (CApplCls n args) | (not.(isglob c)) n && ((fv c) n == []) =
             return $ Just $ CApplDir ((rn c) n) args
 
-          r c (CMakeCls n args) | ((rn c) n) == n = return Nothing
+          r c (CMakeCls n args) | ((rn c) n) == n = do
+            let f = (fv c) n
+            if f == args
+                then return Nothing
+                else return $ Just $ CMakeCls n f
+
           r c (CMakeCls n args)  = rbind n ((fbind c) ((rn c) n))
+
+          r c (CFun (Fun fn a f b)) = do
+            let aset = S.fromList $ alive b
+            let f' = filter (flip S.member aset) f
+
+            trace ("TRACE: CFun " ++ fn ++ " " ++ (show aset) ++ " " ++ (show f) ++ " " ++ (show f')) $ return () 
+
+            if f' == f 
+                then return Nothing
+                else return $ Just $ CFun (Fun fn a f' b)
 
           r c x = return Nothing
 
@@ -179,8 +223,17 @@ conv2 k = do
           rbind n (Just p@(Fun fn a f r)) = do
             return $ Just $ CMakeCls fn f
 
+          alive c = para a c
+
+          a (CVar n) r = n : concat r
+          a (CMakeCls n args) r = n:args ++ concat r
+          a (CApplCls n args) r = n:args ++ concat r
+          a (CApplDir n args) r = n:args ++ concat r
+          a (CCond n _ _) r = n : concat r
+          a x r = concat r
+
           addFns (CLet n c c2) q = CLetR (q ++ [(n, c)]) c2
-          addFns (CLetR b c2)  q = CLetR (b ++ q) c2
+          addFns (CLetR b c2)  q = CLetR (q ++ b) c2
 
           init = C2 M.empty M.empty M.empty
           initf v@(C2 {cfree = fr}) f = v {cfree = f}
@@ -475,7 +528,9 @@ instance Pretty Closure where
     pPrintPrec _ _ (CInt n) = integer n
     pPrintPrec _ _ (CStr s) = (text.show) s
     pPrintPrec _ _ (CVar v) = text v
-    pPrintPrec l p (CFun (Fun n args free e)) = prettyParen True $ text "func" <+> prettyParen True (text n <+> (fsep $ map text (args++free)))
+    pPrintPrec l p (CFun (Fun n args free e)) = prettyParen True $ text "func" <+> text n
+                                                <+> prettyParen True (fsep $ map text (args))
+                                                <+> prettyParen True (fsep $ map text (free))
                                                 <+> pPrintPrec l p e
     pPrintPrec l p (CApplCls n a) = prettyParen True $ text "apply-closure" <+> text n <+> ( fsep $ map text a )
     pPrintPrec l p (CApplDir n a) = prettyParen True $ text "apply-direct" <+> text n <+> ( fsep $ map text a )

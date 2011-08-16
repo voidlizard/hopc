@@ -1,4 +1,11 @@
 
+($ ccall random :int $)
+($ ccall display :int :unit $)
 
-(+jopa)
+(define x (random))
+
+(define (poo) (display x))
+
+(poo)
+
 

@@ -61,7 +61,7 @@ main = do
                                 >>= L.flattenM
 
 --               c1 <- C.convert k'' -- >>= E.eliminate
-               c1 <- C.conv2 k'' -- >>= E.eliminate
+               c1 <- C.conv2 k'' >>= E.eliminate
 
 --               C.addTopLevelFunctions c1
 

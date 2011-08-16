@@ -59,7 +59,6 @@ getEntries = do
     (CompileState d) <- get
     return $ M.map eType d
 
-
 entryList :: CompileM [(KId,Entry)]
 entryList = do 
     (CompileState d) <- get

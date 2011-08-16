@@ -5,5 +5,5 @@
 
 (define (q) plus)
 
-(q 1 2)
+((q) 1 2)
 
