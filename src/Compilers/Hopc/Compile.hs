@@ -18,7 +18,7 @@ data Entry = Entry { eType :: HType, eTop :: Bool } deriving (Show)
 
 type Dict = M.Map KId Entry 
 
-data CompileState = CompileState Dict deriving (Show)
+data CompileState = CompileState Dict (Maybe KId) deriving (Show)
 
 newtype CompileM a = CompileM {
     runT :: (StateT CompileState (ErrorT CompileError IO)) a
@@ -31,22 +31,22 @@ runCompile :: CompileState
 
 runCompile init f = runErrorT (runStateT (runT f) init)
 
-initCompile = CompileState M.empty
+initCompile = CompileState M.empty Nothing
 
 addEntry :: Bool -> KId -> HType -> CompileM ()
 addEntry tp n t = do 
-    (CompileState d) <- get
+    (CompileState d e) <- get
     let d' = M.insert n (Entry {eType = t, eTop = tp}) d
-    put (CompileState d')
+    put (CompileState d' e)
 
 addEntries :: Bool -> [(KId, HType)] -> CompileM ()
 addEntries t ls = do
     let dict = M.fromList (map (\(a, b) -> (a, Entry b t)) ls)
-    modify ( \(CompileState d) -> CompileState (M.union d dict))
+    modify ( \(CompileState d e) -> CompileState (M.union d dict) e)
 
 getEntry :: KId -> CompileM (Maybe Entry)
 getEntry n = do
-    (CompileState d) <- get
+    (CompileState d _) <- get
     return $ M.lookup n d
 
 getEntryType :: KId -> CompileM (Maybe HType)
@@ -56,16 +56,26 @@ getEntryType n = do
 
 getEntries :: CompileM (M.Map KId HType)
 getEntries = do 
-    (CompileState d) <- get
+    (CompileState d _) <- get
     return $ M.map eType d
 
 entryList :: CompileM [(KId,Entry)]
 entryList = do 
-    (CompileState d) <- get
+    (CompileState d _) <- get
     return $ M.toList d
 
 names :: CompileM (S.Set KId)
 names = do
-    (CompileState d) <- get
+    (CompileState d _) <- get
     return $ M.keysSet d
+
+setEntryPoint :: KId -> CompileM ()
+setEntryPoint s = do
+    (CompileState d e) <- get
+    put (CompileState d (Just s))
+
+getEntryPoint :: CompileM (Maybe KId)
+getEntryPoint = do
+    (CompileState _ e) <- get
+    return e
 

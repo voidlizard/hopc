@@ -23,7 +23,7 @@ import Text.PrettyPrint.HughesPJClass (prettyShow)
 import Text.Printf
 import Debug.Trace
 
-data Conv = Conv { regno :: Int, lbl :: Int, regmap :: M.Map KId R, funlbl :: M.Map KId LabelId }
+data Conv = Conv { regno :: Int, lbl :: Int, regmap :: M.Map KId R, funlbl :: M.Map KId LabelId}
 
 type ConvM = StateT Conv CompileM
 
@@ -32,9 +32,14 @@ retvalReg = (R 1)
 convert  :: Closure -> CompileM IR
 convert k = trace "TRACE: FromClosure :: convert " $ do
 
-    v <- evalStateT (tr retvalReg k) init
+    (v, s) <- runStateT (tr retvalReg k) init
 
-    return $ IR v
+    ep  <- getEntryPoint
+    lbl <- evalStateT ( maybe (return Nothing) getFunLbl' ep ) s
+
+    let value = maybe v (\l -> [opc (JUMP l) "entry point"] ++ (skipEntry l v)) lbl
+
+    return $ IR value
 
     where 
           tr :: R -> Closure -> ConvM [Instr]
@@ -66,7 +71,7 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
             let rc = fromJust rc'
 
             return $ [opc (CALL_CLOSURE rc regs) ("call-closure " ++ n)] ++ mov retvalReg r "ret. val."
-          
+        
           tr r (CApplDir n args) = do
             entry <- lift $ getEntry n
             applDir r n args entry
@@ -201,6 +206,9 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
             modify (\x@(Conv {funlbl=fl}) -> x{funlbl=M.insert n l fl})
             return l 
 
+          getFunLbl' :: KId -> ConvM (Maybe LabelId)
+          getFunLbl' n = gets (M.lookup n . funlbl)
+
           getFunLbl :: KId -> ConvM LabelId -- TODO: error handling (unknown label)
           getFunLbl n = do
             l <- gets (M.lookup n . funlbl)
@@ -208,6 +216,9 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
 
           init  = Conv {regno = 3, lbl = 0, regmap = M.empty, funlbl = M.empty} -- FIXME: remove the hardcode
 
+          skipEntry l v = filter entr v
+            where entr (I (CALL_LOCAL x _) _) | x == l = False
+                  entr _ = True
 
           mov (R a) (R b) dsc | a == b = []
           mov a b dsc = [opc (MOV a b) dsc]

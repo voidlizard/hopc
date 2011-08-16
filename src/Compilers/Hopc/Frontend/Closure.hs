@@ -51,8 +51,15 @@ data C3 = C3 { fv :: KId -> [KId],
 type C2M = StateT C2 CompileM
 type C4M = StateT (M.Map KId KId) CompileM
 
+entryPoint = "ENTRY" --- TODO: options?
+
 conv2 :: KTree -> CompileM Closure
-conv2 k = do
+conv2 k' = do
+
+    addEntry False entryPoint (TFun TFunLocal [] TUnit) -- FIXME: hack?
+    let k = KLet entryPoint  (KLambda [] k') (KApp entryPoint [])
+    setEntryPoint (fname entryPoint)
+
     (v,s) <- runStateT (p k) init
     entries <- entryList 
     let e = [ x | x@(n, (Entry t tp)) <- entries, tp == True]
@@ -128,7 +135,7 @@ conv2 k = do
                (TFun spec args rt) -> return $ TFun spec (args ++ tf) rt
                _                   -> error $ "COMPILER ERROR / TYPE ERROR [CALL OF NOT APPLICABLE] " ++ n
 
-        addEntry False fn nf 
+        addEntry False fn nf
 
         liftIO $ print (tn : tf)
 
