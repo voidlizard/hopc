@@ -71,7 +71,8 @@ conv2 k = do
     let g n = S.member n glob
 
     q <- forM (M.toList (cfn s)) $ \(n, l@(KLambda args b)) -> do
-        (b, s) <- runStateT (p b) $ finit 
+        (b, s) <- runStateT (p b) $ finit
+--        let fn = CFun (Fun (fname n) args (f n) (injectSelfCls n (f n) b))
         let fn = CFun (Fun (fname n) args (f n) b)
         return (fname n, fn)
 
@@ -83,6 +84,7 @@ conv2 k = do
 
     let bs = [n | (CMakeCls n args) <- universe cl]
     let rl = M.fromList $ map (\a -> (a, fname a)) $ S.toList $ S.fromList bs `S.difference` glob
+    let rl' = M.fromList $ map (\(a,b) -> (b,a)) $ M.toList rl
 
     let rn  n = maybe n id (M.lookup n rl)
 
@@ -95,11 +97,15 @@ conv2 k = do
     let fb2 n = M.lookup n fs2
     let flt n k = f2 n
 
-    (cl'', s) <- runStateT (rewriteBiM (r (C3 f2 g fb2 rn flt)) cl') (M.empty)
+    let nr n = M.lookup n rl'
+--    let fss n = maybe [] id (f2 n)
+    let ct = rewriteBi (rself nr f2) cl'
+
+    (cl'', s) <- runStateT (rewriteBiM (r (C3 f2 g fb2 rn flt)) ct) (M.empty)
 
     let bs = [(fn, p) | (CFun p@(Fun fn args free b)) <- universe cl'']
 
-    let rl' = M.fromList $ map (\(a,b) -> (b,a)) $ M.toList rl
+
 
     liftIO $ print rl'
 
@@ -207,6 +213,15 @@ conv2 k = do
 
           r c x = return Nothing
 
+          rself :: (KId -> Maybe KId) -> (KId -> [KId]) -> Closure -> Maybe Closure
+          rself nr fv (CApplCls n args) = trace ("TRACE rself " ++ n) $
+            let nm = nr (fname n)
+            in trace ("NM " ++ (show nm)) $ case nm of
+                Just x | x == n -> Just $ CApplDir (fname n) $ args ++ (fv (fname n))
+                _ -> Nothing
+
+          rself _ _ _ = Nothing
+
           alive c = para a c
 
           a (CVar n) r = n : concat r
@@ -219,6 +234,9 @@ conv2 k = do
 
           addFns (CLet n c c2) q = CLetR (q ++ [(n, c)]) c2
           addFns (CLetR b c2)  q = CLetR (q ++ b) c2
+
+          injectSelfCls n fr (CLet _ c c2) = CLetR ( (n, CMakeCls (fname n) (Just fr)) : [(n, c)]) c2
+          injectSelfCls n fr (CLetR  b c2) = CLetR ( (n, CMakeCls (fname n) (Just fr)) : b) c2
 
           init = C2 M.empty M.empty M.empty
           initf v@(C2 {cfree = fr}) f = v {cfree = f}
