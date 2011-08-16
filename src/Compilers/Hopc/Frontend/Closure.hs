@@ -34,7 +34,7 @@ data Closure =  CInt Integer
               | CCond KId Closure Closure
               | CVar KId
               | CFun Fun
-              | CMakeCls KId [KId]
+              | CMakeCls KId (Maybe [KId])
               | CApplCls KId [KId]
               | CApplDir KId [KId] 
              deriving (Show, Eq, Data, Typeable)
@@ -132,12 +132,12 @@ conv2 k = do
 
     where 
           p :: KTree -> C2M Closure
-          p (KLet  n e e1) = liftM2 (CLet n) (liftM snd (pb (n,e))) (p e1)     -- undefined --CLet n ((snd.pb) (n,e)) (p e1)
-          p (KLetR b e1)   = liftM2 CLetR (mapM pb b) (p e1)  -- undefined -- mapM_ pb b >>= \x -> CLetR  x >>= undefined --CUnit -- >> undefined --CLetR (map pb b) (p e1)
+          p (KLet  n e e1) = liftM2 (CLet n) (liftM snd (pb (n,e))) (p e1)
+          p (KLetR b e1)   = liftM2 CLetR (mapM pb b) (p e1)
           p (KVar n) = lift (getEntryType n) >>= cvar n 
           p (KInt v) = return $ CInt v
           p (KStr s) = return $ CStr s
-          p (KCond n e1 e2) = liftM2 (CCond n) (p e1) (p e2) -- undefined -- return $ CCond n (p e1) (p e2)
+          p (KCond n e1 e2) = liftM2 (CCond n) (p e1) (p e2)
           p (KUnit) = return $ CUnit
           p (KApp n e) = return $ CApplCls n e
           p x = error $ "unexpected " ++ (show x) -- FIXME: compiler error
@@ -148,7 +148,7 @@ conv2 k = do
             put st {cfn = M.insert n l f}
 
           cvar :: KId -> Maybe HType -> C2M Closure 
-          cvar n (Just (TFun _ _ _)) = return $ CMakeCls n []
+          cvar n (Just (TFun _ _ _)) = return $ CMakeCls n Nothing 
           cvar n (Just _) = return $ CVar n
           cvar n Nothing = lift $ throwError TypingError -- FIXME: more information
 
@@ -156,9 +156,9 @@ conv2 k = do
             fv <- gets (M.lookup n . cfree)
             trace ("TRACE: CLOS FV " ++ (show fv)) $ return ()
             case fv of
-                Nothing -> return $ CMakeCls n []
-                Just [] -> return $ CMakeCls n []
-                Just x  -> return $ CMakeCls n x 
+                Nothing -> return $ CMakeCls n Nothing 
+                Just [] -> return $ CMakeCls n Nothing 
+                Just x  -> return $ CMakeCls n (Just x) 
 
           fl (KLambda _ _) r = [] 
           fl (KVar n )     r = concat r ++ [Right n]
@@ -183,20 +183,24 @@ conv2 k = do
           r c (CApplCls n args) | (not.(isglob c)) n && ((fv c) n == []) =
             return $ Just $ CApplDir ((rn c) n) args
 
-          r c (CMakeCls n args) | ((rn c) n) == n = do
-            trace ( "CMAKECLS I " ++ n ++ " " ++ ((rn c)n) ++ " "  ++ (show args) ) $ return ()
+          r c (CMakeCls n Nothing) = do
+            let nn = ((rn c) n)
+            trace ("MAKE CLOS " ++ n ++ " " ++ nn) $ return Nothing
 
-            let f = (fv c) n
-            
-            trace ( "CMAKECLS I - a " ++ (show f) ++ " " ++ (show args) ) $ return ()
-            
-            if f == args
-                then return Nothing
-                else return $ Just $ CMakeCls n f
+--          r c (CMakeCls n args) | ((rn c) n) == n = do
+--            trace ( "CMAKECLS I " ++ n ++ " " ++ ((rn c)n) ++ " "  ++ (show args) ) $ return ()
 
-          r c (CMakeCls n args)  = do
-            trace ( "CMAKECLS II " ++ (show args) ) $ return ()
-            rbind n ((fbind c) ((rn c) n))
+--            let f = (fv c) n
+--            
+--            trace ( "CMAKECLS I - a " ++ (show f) ++ " " ++ (show args) ) $ return ()
+--            
+--            if f == args
+--                then return Nothing
+--                else return $ Just $ CMakeCls n f
+
+--          r c (CMakeCls n args)  = do
+--            trace ( "CMAKECLS II " ++ (show args) ) $ return ()
+--            rbind n ((fbind c) ((rn c) n))
 
           r c (CFun (Fun fn a f b)) = do
             let aset = S.fromList $ alive b
@@ -213,12 +217,14 @@ conv2 k = do
           rbind n Nothing = return Nothing 
 
           rbind n (Just p@(Fun fn a f r)) = do
-            return $ Just $ CMakeCls fn f
+            undefined
+--            return $ Just $ CMakeCls fn f
 
           alive c = para a c
 
           a (CVar n) r = n : concat r
-          a (CMakeCls n args) r = n:args ++ concat r
+          a (CMakeCls n (Just args)) r = n:args ++ concat r
+          a (CMakeCls n Nothing) r = n : concat r
           a (CApplCls n args) r = n:args ++ concat r
           a (CApplDir n args) r = n:args ++ concat r
           a (CCond n _ _) r = n : concat r
@@ -243,7 +249,7 @@ instance Pretty Closure where
                                                 <+> pPrintPrec l p e
     pPrintPrec l p (CApplCls n a) = prettyParen True $ text "apply-closure" <+> text n <+> ( fsep $ map text a )
     pPrintPrec l p (CApplDir n a) = prettyParen True $ text "apply-direct" <+> text n <+> ( fsep $ map text a )
-    pPrintPrec l p (CMakeCls s f) = prettyParen True $ text "make-closure" <+> text s <+> ( fsep $ map text f )
+    pPrintPrec l p (CMakeCls s f) = prettyParen True $ text "make-closure" <+> text s <+> maybe empty (fsep.(map text)) f
     pPrintPrec l p (CLet i e1 e2) = prettyParen True $ text "let"
                                     <+> prettyParen True (prettyParen True $ text i <+> pPrintPrec l p e1)
                                     $$ nest 2 (pPrintPrec l p e2)
@@ -296,7 +302,8 @@ eliminate k = trace "TRACE: eliminate" $
           u (CApplCls n args) r = concat r ++ n:args
           u (CApplDir n args) r = concat r ++ n:args
           u (CVar n) r = concat r ++ [n]
-          u (CMakeCls n args) r = concat r ++ n:args
+          u (CMakeCls n (Just args)) r = concat r ++ n:args
+          u (CMakeCls n Nothing) r = n:concat r
           u (CCond n _ _) r = concat r ++ [n]
           u x r = concat r
 
