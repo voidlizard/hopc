@@ -1,0 +1,10 @@
+
+($ ccall display :string :unit $)
+($ ccall gets :string $)
+
+(define (goo) (let ((x (gets))) (lambda () (display x))))
+
+((goo))
+
+
+

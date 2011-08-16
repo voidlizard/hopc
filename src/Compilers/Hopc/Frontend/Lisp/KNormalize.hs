@@ -1,10 +1,14 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, OverloadedStrings #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, OverloadedStrings, DeriveDataTypeable #-}
 
 module Compilers.Hopc.Frontend.Lisp.KNormalize where
 
 import Compilers.Hopc.Compile
 import qualified Data.ByteString.Char8 as BS
 import Text.Printf
+
+import Data.Data
+import Data.Typeable
+import Data.Generics.PlateData
 
 import Control.Monad.State
 import Control.Monad.Trans
@@ -24,7 +28,7 @@ toString :: BS.ByteString -> String
 toString = BS.unpack
 
 kNormalizeExp :: Exp -> CompileM KTree
-kNormalizeExp e = evalStateT (knorm e) kInitState
+kNormalizeExp e = evalStateT (knormSeq [e]) kInitState
 
 kNormalizeTop :: TopLevel -> CompileM KTree
 kNormalizeTop (TopLevel c) = flip evalStateT kInitState (knormSeq c)
@@ -52,13 +56,14 @@ knormSeq :: [Exp] -> KNormStateM KTree
 knormSeq [] = return KUnit
 
 knormSeq seq = do
+
     let (last:all) = reverse seq
     es <- mapM knormN (reverse all)
     (t, last') <- knormN last
     lastNorm <- knormTail last'
     if es == []
-        then return $ if isDef last then KLetR [(t, last')] KUnit else lastNorm
-        else return $ if isDef last then KLetR (es++[(t, last')]) KUnit else KLetR es lastNorm 
+        then rewriteBiM r $ if isDef last then KLetR [(t, last')] KUnit else lastNorm
+        else rewriteBiM r $ if isDef last then KLetR (es++[(t, last')]) KUnit else KLetR es lastNorm
 
     where knormTail :: KTree -> KNormStateM KTree
           knormTail l@(KLambda args k) = do
@@ -66,6 +71,17 @@ knormSeq seq = do
             return $ KLet n l (KVar n) 
 
           knormTail x = return x 
+
+          r (KLet n e el@(KLambda _ _)) = do
+            ln <- tmp "l" "tmp"
+            return $ Just $ KLetR [(n,e), (ln, el)] (KVar ln)
+
+          r (KLetR bs el@(KLambda _ _)) = do 
+            ln <- tmp "l" "tmp"
+            return $ Just $ KLetR (bs ++ [(ln, el)]) (KVar ln)
+
+          r _  = return Nothing
+
 
 kInitState :: KNormState
 kInitState = KNormState { tmpId = 0 }
@@ -114,10 +130,21 @@ knorm m@(EMacro1 o e c) = do
 
 --knorm (EList _ _ _ _) = error "List literals are not supported yet"
 
+
 knorm (ELambda _ _ args _ e _) = do
     let args' = map withArg args
     e' <- knorm e
     return $ KLambda args' e'
+
+--knorm (ELetM p1 p2 binds p3 el@(ELambda _ _ args _ e _) p4) = do
+--    error "GOT LAMBDA"
+--    el' <- knorm el
+--    binds' <- forM binds $ \(EBind _ (AtomT (_, bs)) eb _) -> 
+--                do let t  = toString bs
+--                   eb' <- knorm eb
+--                   return (t, eb')
+--    e' <- knorm e
+--    return $ KLetR binds' e'
 
 knorm (ELetM p1 p2 binds p3 e p4) = do
     binds' <- forM binds $ \(EBind _ (AtomT (_, bs)) eb _) -> 
@@ -126,6 +153,13 @@ knorm (ELetM p1 p2 binds p3 e p4) = do
                    return (t, eb')
     e' <- knorm e
     return $ KLetR binds' e'
+
+--knorm (ELet p1 p2 (AtomT (p21, bs)) eb p3 el@(ELambda _ _ args _ e _) p4) = do
+--    error "GOT LAMBDA"
+--    eb' <- knorm eb
+--    e'  <- knorm e
+--    let tmpname = toString bs
+--    return $ KLet tmpname eb' e'
 
 knorm (ELet p1 p2 (AtomT (p21, bs)) eb p3 e p4) = do
     eb' <- knorm eb

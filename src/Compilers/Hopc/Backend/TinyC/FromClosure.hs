@@ -74,8 +74,10 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
           tr r (CMakeCls n args) = do
             let a = maybe [] id args
             regs <- getRegList a 
+--            l <- getFunLbl n
             rr <- newreg
-            return $ [opc NOP ("make-closure " ++ show regs), opc (MOV rr r) n]
+            return $ [opc NOP ("make-closure " ++ n ++ " "  ++ show regs), opc (MOV rr r) n]
+--            return $ [opc MAKE_CLOSURE n ] NOP ("make-closure " ++ show regs), opc (MOV rr r) n]
 
           tr r (CVar n) = do
             r2 <- getReg n
