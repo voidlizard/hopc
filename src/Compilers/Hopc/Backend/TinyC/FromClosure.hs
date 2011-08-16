@@ -58,27 +58,35 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
             -- TODO: regs <> args -> unknown var check
             -- TODO: regs <> at   -> bad function call
 
-            r <- getReg n  -- TODO: CALL-CLOSURE
-            return $ [opc (CALL_CLOSURE r regs) ("call-closure")] ++ mov retvalReg r "ret. val."
+            rc' <- getReg' n  -- TODO: CALL-CLOSURE
+            trace ("TRACE: CALL CLOSURE " ++ n ++ " " ++ (show rc')) $ return ()
+
+            when ((not.isJust) rc') $ error $ "UNKNOWN VARIABLE " ++ n
+
+            let rc = fromJust rc'
+
+            return $ [opc (CALL_CLOSURE rc regs) ("call-closure " ++ n)] ++ mov retvalReg r "ret. val."
           
           tr r (CApplDir n args) = do
             entry <- lift $ getEntry n
             applDir r n args entry
 
           tr r (CMakeCls n args) = do
+            let a = maybe [] id args
+            regs <- getRegList a 
             rr <- newreg
-            return $ [opc NOP "make-closure", opc (MOV rr r) n]
+            return $ [opc NOP ("make-closure " ++ show regs), opc (MOV rr r) n]
 
           tr r (CVar n) = do
             r2 <- getReg n
-            trace ("TRACE: WTF? " ++ n) $ return () --- FIXME: CHECK FOR CLOSURE?
-            error "I'm so sorry, but u need typing here"
+--            trace ("TRACE: WTF? " ++ n ++ " " ++ (show r2)) $ return () --- FIXME: CHECK FOR CLOSURE?
+--            error "I'm so sorry, but u need typing here"
             return $ mov r2 r (printf "%s -> %s" n (prettyShow r))
 
           tr r (CCond n e1 e2) = do
             c1 <- tr r e1
             c2 <- tr r e2
-            r  <- getReg n
+            rc  <- getReg n
 
             l1 <- newlbl
             l3 <- newlbl
@@ -86,7 +94,7 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
             let ll1 = LABEL l1
             let ll3 = LABEL l3
 
-            return $ op (CJUMP (JumpFake r) l1) : c2 ++ op (JUMP l3) : (op ll1) : c1 ++ op ll3 : []
+            return $ op (CJUMP (JumpFake rc) l1) : c2 ++ op (JUMP l3) : (op ll1) : c1 ++ op ll3 : []
 
           tr r (CInt v)= do
               return $ [op (CONST (show v) r)]
@@ -95,8 +103,12 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
             return $ [op (CONST "Sx" r)]
 
           tr r1 (CVar k) = do
-            r2 <- getReg k
-            trace ("TRACE: WTF? " ++ k) $ return ()
+            r2' <- getReg' k
+
+            when ((not.isJust) r2') $ error $ "UNKNOWN VARIABLE " ++ k
+
+            let r2 = fromJust r2'
+
             return $ mov r2 r1 ""
 
           tr r x = return $ [opc NOP $"unsupported " ++ (prettyShow x)]

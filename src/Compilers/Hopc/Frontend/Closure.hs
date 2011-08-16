@@ -77,10 +77,6 @@ conv2 k = do
 
     let bmap = M.fromList q
 
-    liftIO $ putStrLn " -== "
-    forM_ (M.toList bmap) $ liftIO . print
-    liftIO $ putStrLn " -== "
-
     let fb n = maybe Nothing (\(CFun f) -> Just f) (M.lookup n bmap)
 
     let cl = addFns v q
@@ -191,7 +187,7 @@ conv2 k = do
             case b of
                 Nothing -> return Nothing
                 (Just (Fun n _ [] _)) -> return $ Just $ CApplDir ((rn c) n) args
-                (Just (Fun n _ xs _)) -> return Nothing 
+                (Just (Fun n _ xs _)) -> return Nothing
 
           r c (CMakeCls n Nothing) = return $ Just $ CMakeCls ((rn c) n) (Just ((fv c) n))
 
