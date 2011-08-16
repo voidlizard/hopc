@@ -1,17 +1,19 @@
-{-# LANGUAGE EmptyDataDecls #-}
+{-# LANGUAGE EmptyDataDecls, OverloadedStrings, DeriveDataTypeable  #-}
 module Compilers.Hopc.Frontend.Types where
 
-import Compilers.Hopc.Frontend.KTree (KId)
+import Data.Data
+import Data.Typeable
+
+import Compilers.Hopc.Id (KId)
 import Compilers.Hopc.Typing.Types
 
 import Debug.Trace
 
-data TFunSpec = TFunForeign KId | TFunLocal deriving (Eq, Show)
+data TFunSpec = TFunForeign KId | TFunLocal deriving (Eq, Show, Data, Typeable)
 
 data HType = TVar TypeId | TInt | TStr | TBool | TUnit | TFun TFunSpec [HType] HType
              | TAppl TypeId
-             deriving (Eq, Show)
-
+             deriving (Show, Eq, Data, Typeable)
 
 
 --instance Compilers

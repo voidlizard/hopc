@@ -12,13 +12,20 @@ ELambda. Exp ::= O "lambda" O [AtomT] C Exp C;
 EApply.  Exp ::= O Exp [Exp] C;
 EBegin.  Exp ::= O "begin" [Exp] C;
 ECond.   Exp ::= O "if" Exp Exp Exp C;
-EMacro1. Exp ::= O "$" [Exp] "$" C;
+
+EMacroT.  Exp ::= TypeVar;
 
 EBind.   Bind ::= O AtomT Exp C;
 EDef.    Exp  ::= Def;
 
 DefExp.  Def ::= O "define" AtomT Exp C;
 DeFun.   Def ::= O "define" O AtomT [AtomT] C [Exp] C;
+
+-- Types
+
+ETypeFunForeign. TypeVar ::= O "$" "deftype" O "foreign" String O AtomT [AtomT] C AtomT C "$" C ;
+ETypeFun.        TypeVar ::= O "$" "deftype" O O AtomT [AtomT] C AtomT C "$" C ;
+ETypeVar.        TypeVar ::= O "$" "deftype" O AtomT AtomT C "$" C;
 
 terminator Exp "";
 terminator Def "";

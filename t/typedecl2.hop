@@ -1,0 +1,8 @@
+
+($ deftype (foreign "display" (display :string) :unit) $) 
+($ deftype ((main) :unit) $)
+
+(define (main) 
+    (display "JOPA")
+)
+

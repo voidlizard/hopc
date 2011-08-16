@@ -1,0 +1,6 @@
+
+
+
+  
+(let ((x "JOPA"))  (begin ($ deftype (x :int) $) x) )
+

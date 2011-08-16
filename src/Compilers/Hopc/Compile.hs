@@ -59,6 +59,11 @@ getEntries = do
     (CompileState d _) <- get
     return $ M.map eType d
 
+getConstraints :: CompileM [(HType, HType)]
+getConstraints = do
+    e <- getEntries 
+    return $ map (\(a,b) -> (TVar a, b)) $ M.toList e
+
 entryList :: CompileM [(KId,Entry)]
 entryList = do 
     (CompileState d _) <- get

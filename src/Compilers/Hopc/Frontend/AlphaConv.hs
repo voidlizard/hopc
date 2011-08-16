@@ -9,16 +9,17 @@ import Data.Generics.Biplate
 import Compilers.Hopc.Compile
 import Compilers.Hopc.Error
 import Compilers.Hopc.Frontend.KTree
+import Compilers.Hopc.Frontend.Types
 
-data AlphaConv = AlphaConv { aId :: Int, aEnv :: M.Map KId KId } deriving Show
+import Debug.Trace
 
-type AlphaConvM = State AlphaConv
+data AlphaConv = AlphaConv { aId :: Int, aEnv :: M.Map KId KId, aTp :: M.Map KId HType } deriving Show
 
-alphaConvM :: KTree -> CompileM KTree
-alphaConvM = return . alphaConv
+type AlphaConvM = StateT AlphaConv CompileM
 
-alphaConv :: KTree -> KTree
-alphaConv k = evalState (descendBiM tr k) aInitState
+alphaConv :: KTree -> CompileM KTree
+alphaConv k = evalStateT (descendBiM tr k) aInitState
+
     where tr :: KTree -> AlphaConvM KTree
 
           tr (KLet s e1 e2) = do
@@ -26,6 +27,7 @@ alphaConv k = evalState (descendBiM tr k) aInitState
             sn <- replVar s
             e2' <- tr e2
             return $ KLet sn e1' e2'
+
 
           tr (KLetR binds e2) = do
             forM_ binds (replVar.fst)
@@ -40,7 +42,7 @@ alphaConv k = evalState (descendBiM tr k) aInitState
 
           tr (KLambda args e) = do
             st@(AlphaConv {aId = aid, aEnv = aenv}) <- get
-            let (v, s) = flip runState st $ do
+            (v, s) <- lift $ flip runStateT st $ do
                 vars <- mapM replVar args
                 e'   <- tr e
                 return $ KLambda vars e'
@@ -60,19 +62,39 @@ alphaConv k = evalState (descendBiM tr k) aInitState
             e2' <- tr e2
             return $ KCond t' e1' e2'
 
+          tr s@(KSpecial (KTypeDef (n, t))) = do
+            st@(AlphaConv {aTp = tps}) <- get
+            put st { aTp = M.insert n t tps}
+
+            st2@(AlphaConv {aTp = tps}) <- get
+            trace ("TRACE: KSpecial tps " ++ (show st2)) $ return ()
+
+            return KUnit
+
           tr x = return x
 
-aInitState = AlphaConv { aId = 0, aEnv = M.empty }
+          aInitState = AlphaConv { aId = 0, aEnv = M.empty, aTp = M.empty }
 
-getVar :: KId -> AlphaConvM KId
-getVar s = do
-    st@(AlphaConv {aEnv = env}) <- get
-    return $ maybe s id $ M.lookup s env
+          getVar :: KId -> AlphaConvM KId
+          getVar s = do
+              st@(AlphaConv {aEnv = env, aTp = tps}) <- get
 
-replVar :: KId -> AlphaConvM KId
-replVar s = do
-    AlphaConv {aId = n, aEnv = env} <- get
-    let nv = s ++ "_" ++ show n
-    put AlphaConv { aId = n+1, aEnv = M.insert s nv env }
-    return nv
+              
+              let n = M.lookup s env
+              let tp = M.lookup s tps
 
+              trace ("TRACE: getVar " ++  s ++ " " ++ (show n) ++ " "  ++ (show tp)) $ return ()
+
+              case (n, tp) of
+                (Just nv, Just t) -> lift $ addEntry False nv t
+                _                -> return ()
+
+              return $ maybe s id $ M.lookup s env
+
+          replVar :: KId -> AlphaConvM KId
+          replVar s = do
+              st@(AlphaConv {aId = n, aEnv = env, aTp = tp}) <- get
+              let nv = s ++ "_" ++ show n
+              put st { aId = n+1, aEnv = M.insert s nv env }
+              return nv
+ 

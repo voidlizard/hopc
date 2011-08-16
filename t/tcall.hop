@@ -1,6 +1,5 @@
 
-
-($ ccall "display" :string :unit $)
+($ deftype (foreign "display" (display :string) :unit) $) 
 
 (display "QQQ")
 

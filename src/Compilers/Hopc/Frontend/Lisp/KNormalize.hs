@@ -6,6 +6,9 @@ import Compilers.Hopc.Compile
 import qualified Data.ByteString.Char8 as BS
 import Text.Printf
 
+import qualified Data.Map as M
+import Data.Maybe
+import Data.Either
 import Data.Data
 import Data.Typeable
 import Data.Generics.PlateData
@@ -15,9 +18,9 @@ import Control.Monad.Trans
 
 import Compilers.Hopc.Compile
 import Compilers.Hopc.Error
-import Compilers.Hopc.Frontend.Lisp.MacroExpand as M
 import Compilers.Hopc.Frontend.Lisp.BNFC.Lisp.Abs
 import Compilers.Hopc.Frontend.KTree
+import Compilers.Hopc.Frontend.Types
 
 import Debug.Trace
 
@@ -124,12 +127,33 @@ knorm (EStr s) = return $ KStr s
 
 knorm (EAtom (AtomT (p,bs))) = return $ KVar (toString bs)
 
-knorm m@(EMacro1 o e c) = do
-    e' <- lift $ M.expand m
-    knorm e'
+knorm m@(EMacroT (ETypeFunForeign o0 o1 str o atomt2 atomts c3 atomt c4 c)) = do
+    let n = str
+    let fn = ofatom atomt2
+    let tt = funtype (TFunForeign n) atomts atomt
+    when ((not.isJust) tt) $ error $ "BAD TYPE DECLARATION " ++ n -- FIXME
+    maybe (return ()) (lift . addEntry True fn) tt
+    e <- lift getEntries
+    liftIO $ forM_ (M.toList e) print
+    return KUnit
+
+knorm m@(EMacroT (ETypeFun o0 o1 o atomt2 atomts c3 atomt c4 c)) = do
+
+    let n = ofatom atomt2
+
+    let tt = funtype TFunLocal atomts atomt
+
+    when ((not.isJust) tt) $ error $ "BAD TYPE DECLARATION " ++ n -- FIXME
+    return $ KSpecial (KTypeDef (n, (fromJust tt)))
+
+knorm m@(EMacroT (ETypeVar o0 o atomt1 atomt c2 c)) = do
+    let n = ofatom atomt1
+    let tp = (typeofstr.ofatom) atomt
+    case tp of
+        (Left x) -> error $ "BAD TYPE DECLARATION " ++ (show x)
+        Right t  -> return $ KSpecial (KTypeDef (n, t))
 
 --knorm (EList _ _ _ _) = error "List literals are not supported yet"
-
 
 knorm (ELambda _ _ args _ e _) = do
     let args' = map withArg args
@@ -207,4 +231,21 @@ knormApp fn a = do
             t   <- tmp "" "tmp"
             en  <- knorm e
             return $ (t, KLet t en)
+
+ofatom (AtomT (p, bs)) = toString bs
+
+typeofstr ":unit"   = Right TUnit
+typeofstr ":string" = Right TStr
+typeofstr ":bool"   = Right TBool
+typeofstr ":int"    = Right TInt
+typeofstr x         = Left x
+
+funtype :: TFunSpec -> [AtomT] -> AtomT -> Maybe HType
+funtype spec atomts atomt = do
+    let (err1, at) = partitionEithers $ map (typeofstr.ofatom) atomts
+    let rt = typeofstr $ ofatom atomt
+
+    case (at, rt, err1) of
+        (x, Right r, []) -> Just $ TFun spec (x) r
+        _ -> Nothing
 

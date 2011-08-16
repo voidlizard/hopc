@@ -1,0 +1,7 @@
+
+($ ccall display :string :unit $)
+
+(define (boo) (display k))
+
+(boo)
+

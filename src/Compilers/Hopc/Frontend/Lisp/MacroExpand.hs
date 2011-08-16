@@ -21,8 +21,8 @@ expand _ = error "unexpected AST at MacroExpand.expand"
 
 dispatch :: String -> [String] -> CompileM ()
 dispatch "ccall" args = ccall args
+dispatch "type-decl" args = error "TYPE-DECL MACRO" 
 dispatch x args = trace ("TRACE: UNKNOWN MACRO " ++ (show x)  ++ " " ++ (show args)) $ return ()
-
 
 ccall :: [String] -> CompileM ()
 ccall (nm:l:args) = do

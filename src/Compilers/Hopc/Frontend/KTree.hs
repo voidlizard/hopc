@@ -1,9 +1,14 @@
 {-# LANGUAGE EmptyDataDecls, OverloadedStrings, DeriveDataTypeable  #-}
 module Compilers.Hopc.Frontend.KTree (KTree(..)
+                                     ,Special(..)
                                      ,KId
                                      ,KName
                                      ,KString
                                      ) where
+
+import qualified Compilers.Hopc.Id as I
+
+import Compilers.Hopc.Frontend.Types
 
 import Data.Data
 import Data.Typeable
@@ -16,13 +21,14 @@ import Control.Monad.Error
 
 type KString = String 
 
-type KId = KString 
-
 type KName = KString 
 
---data TType = TLambda | TVar
+type KId = I.KId
 
-data KTree =   KUnit
+data Special = KTypeDef (KId, HType)
+             deriving (Show, Eq, Data, Typeable)
+
+data KTree =   KUnit | KSpecial Special
              | KInt  Integer
              | KStr  String
              | KLet  KId KTree KTree
@@ -38,6 +44,7 @@ instance Pretty KTree where
     pPrintPrec _ _ (KInt n) = integer n 
     pPrintPrec _ _ (KStr s) = (text . show) s
     pPrintPrec _ _ (KVar v) = text v
+    pPrintPrec _ _ (KSpecial _) = prettyParen True (text "special") 
     pPrintPrec l p (KApp n a) = prettyParen True $ text n <+> ( fsep $ map text a )
     pPrintPrec l p (KLet i e1 e2) = prettyParen True $ text "let"
                                     <+> prettyParen True ( (prettyParen True $ text i <+> pPrintPrec l p e1) )

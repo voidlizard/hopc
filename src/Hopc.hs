@@ -38,17 +38,17 @@ main = do
     (x:_) <- getArgs
     input x $ \s -> do
         st <- runCompile initCompile $ do
-               k <- parseTop s >>= K.kNormalizeTop -- >>= dump 
+               k <- parseTop s >>= K.kNormalizeTop  >>= dump 
 --                               >>= A.alphaConvM    >>= dump
 
+               k' <- A.alphaConv k >>= dump
 
-               k' <- A.alphaConvM k >>= dump
-
+               constr2 <- getConstraints 
                constr <- KT.constraints k'
 
-               dumpConstraints (Right constr)
+               dumpConstraints (Right (constr2++constr))
 
-               constr' <- I.inferM constr
+               constr' <- I.inferM (constr++constr2)
 
                addEntries False (map (\(a,b) -> (typeid a, b)) constr')
 

@@ -1,0 +1,5 @@
+
+($ deftype (x :int) $)
+
+(define x "SS")
+
