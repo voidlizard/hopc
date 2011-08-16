@@ -41,7 +41,12 @@ data Closure =  CInt Integer
 
 
 data C2 = C2 { cfn :: M.Map KId KTree, cseen :: M.Map KId (S.Set KId), cfree :: M.Map KId [KId] }
-data C3 = C3 { fv :: KId -> [KId], isglob :: KId -> Bool, fbind :: KId -> Maybe Fun, rn :: KId -> KId }
+data C3 = C3 { fv :: KId -> [KId],
+               isglob :: KId -> Bool,
+               fbind :: KId -> Maybe Fun, 
+               rn :: KId -> KId,
+               fv2 :: KId -> [KId] -> [KId]
+             }
 
 type C2M = StateT C2 CompileM
 type C4M = StateT (M.Map KId KId) CompileM
@@ -62,6 +67,7 @@ conv2 k = do
     liftIO $ print fs
 
     let f n = maybe [] id (M.lookup n fs)
+    let fv2 n k = k 
     let g n = S.member n glob
 
     q <- forM (M.toList (cfn s)) $ \(n, l@(KLambda args b)) -> do
@@ -75,7 +81,7 @@ conv2 k = do
     forM_ (M.toList bmap) $ liftIO . print
     liftIO $ putStrLn " -== "
 
-    let fb n = trace ("FB " ++ n ) $ maybe Nothing (\(CFun f) -> Just f) (M.lookup n bmap)
+    let fb n = maybe Nothing (\(CFun f) -> Just f) (M.lookup n bmap)
 
     let cl = addFns v q
 
@@ -84,16 +90,16 @@ conv2 k = do
 
     let rn  n = maybe n id (M.lookup n rl)
 
-    (cl', s) <- runStateT (rewriteBiM (r (C3 f g fb rn)) cl) (M.empty)
+    (cl', s) <- runStateT (rewriteBiM (r (C3 f g fb rn fv2 )) cl) (M.empty)
 
     liftIO $ putStrLn (prettyShow cl')
-    undefined
 
     let fs2 = M.fromList $ [(f, p) | CFun p@(Fun f args free bdy) <- universe cl']
     let f2  n = maybe [] (\(Fun _ _ f _) -> f) (M.lookup n fs2)
     let fb2 n = M.lookup n fs2
+    let flt n k = f2 n
 
-    (cl'', s) <- runStateT (rewriteBiM (r (C3 f2 g fb2 rn)) cl') (M.empty)
+    (cl'', s) <- runStateT (rewriteBiM (r (C3 f2 g fb2 rn flt)) cl') (M.empty)
 
     let bs = [(fn, p) | (CFun p@(Fun fn args free b)) <- universe cl'']
 
@@ -154,7 +160,6 @@ conv2 k = do
 
           clos n = do
             fv <- gets (M.lookup n . cfree)
-            trace ("TRACE: CLOS FV " ++ (show fv)) $ return ()
             case fv of
                 Nothing -> return $ CMakeCls n Nothing 
                 Just [] -> return $ CMakeCls n Nothing 
@@ -180,45 +185,31 @@ conv2 k = do
           r c (CApplCls n args) | ((isglob c) n) =
             return $ Just $ CApplDir n args
  
-          r c (CApplCls n args) | (not.(isglob c)) n && ((fv c) n == []) =
-            return $ Just $ CApplDir ((rn c) n) args
+          r c (CApplCls n args) | (not.(isglob c)) n = do
+            let nm = ((rn c) n)
+            let b = ((fbind c) nm)
+            case b of
+                Nothing -> return Nothing
+                (Just (Fun n _ [] _)) -> return $ Just $ CApplDir ((rn c) n) args
+                (Just (Fun n _ xs _)) -> return Nothing 
 
-          r c (CMakeCls n Nothing) = do
-            let nn = ((rn c) n)
-            trace ("MAKE CLOS " ++ n ++ " " ++ nn) $ return Nothing
+          r c (CMakeCls n Nothing) = return $ Just $ CMakeCls ((rn c) n) (Just ((fv c) n))
 
---          r c (CMakeCls n args) | ((rn c) n) == n = do
---            trace ( "CMAKECLS I " ++ n ++ " " ++ ((rn c)n) ++ " "  ++ (show args) ) $ return ()
-
---            let f = (fv c) n
---            
---            trace ( "CMAKECLS I - a " ++ (show f) ++ " " ++ (show args) ) $ return ()
---            
---            if f == args
---                then return Nothing
---                else return $ Just $ CMakeCls n f
-
---          r c (CMakeCls n args)  = do
---            trace ( "CMAKECLS II " ++ (show args) ) $ return ()
---            rbind n ((fbind c) ((rn c) n))
+          r c (CMakeCls n (Just f)) = do -- return $ Just $ CMakeCls 
+            let f' = (fv2 c) n f
+            if f' == f
+                then return Nothing
+                else return $ Just $ CMakeCls n (Just f')
 
           r c (CFun (Fun fn a f b)) = do
             let aset = S.fromList $ alive b
             let f' = filter (flip S.member aset) f
-
-            trace ("TRACE: CFun " ++ fn ++ " " ++ (show aset) ++ " " ++ (show f) ++ " " ++ (show f')) $ return () 
 
             if f' == f 
                 then return Nothing
                 else return $ Just $ CFun (Fun fn a f' b)
 
           r c x = return Nothing
-
-          rbind n Nothing = return Nothing 
-
-          rbind n (Just p@(Fun fn a f r)) = do
-            undefined
---            return $ Just $ CMakeCls fn f
 
           alive c = para a c
 
