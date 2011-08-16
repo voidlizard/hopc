@@ -3,9 +3,8 @@
 ($ deftype (foreign "newline" (newline :unit) :unit) $) 
 ($ deftype (foreign "sleep"   (sleep :int) :unit) $)
 ($ deftype (foreign "putint"  (putint :int) :unit) $)
-($ deftype (foreign "-"       (- :int :int) :int) $) 
-($ deftype (foreign ">"       (> :int :int) :bool) $) 
-
+($ deftype (foreign "minus"       (- :int :int) :int) $) 
+($ deftype (foreign "gt"       (> :int :int) :bool) $) 
 
 (let ((x (random))
       (main (lambda (y) (begin (display "PIU ") (putint x) (newline) (if (> y 0) (main (- y 1)) 0 ) ) ;; 
