@@ -4,8 +4,8 @@
 
 (define x (random))
 
-(define (poo) (display x))
+(define (poo n) (display x) (display n))
 
-(poo)
+(poo 2)
 
 
