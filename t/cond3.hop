@@ -1,6 +1,6 @@
 
-($ ccall "eq?" :int :int :int $)
-($ ccall "display" :string :unit  $)
+($ foreign "eq" eq? ((:int :int) :bool) $)
+($ foreign "display" display ((:string) :unit) $)
 
 (define x 10)
 

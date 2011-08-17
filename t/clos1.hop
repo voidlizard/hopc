@@ -1,6 +1,6 @@
 
-($ ccall display :string :unit $)
-($ ccall gets :string $)
+($ foreign "display" display ((:string) :unit) $)
+($ foreign "gets" gets ((:unit) :string) $)
 
 (define (goo) (let ((x (gets))) (lambda () (display x))))
 
