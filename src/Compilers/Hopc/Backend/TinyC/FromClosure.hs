@@ -32,12 +32,13 @@ retvalReg = (R 1)
 convert  :: Closure -> CompileM IR
 convert k = trace "TRACE: FromClosure :: convert " $ do
 
-    (v, s) <- runStateT (tr retvalReg k) init
+    (l0, s) <- runStateT ( getFunLbl "" ) init
+    (v,  s) <- runStateT (tr retvalReg k) s
 
     ep  <- getEntryPoint
     lbl <- evalStateT ( maybe (return Nothing) getFunLbl' ep ) s
 
-    let value = maybe v (\l -> [opc (JUMP l) "entry point"] ++ (skipEntry l v)) lbl
+    let value = maybe v (\l -> [op (LABEL l0), opc (JUMP l) "entry point"] ++ (skipEntry l v)) lbl
 
     return $ IR value
 

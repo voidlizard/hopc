@@ -24,6 +24,8 @@ import Compilers.Hopc.Typing.Types
 import Compilers.Hopc.Backend.TinyC.IR
 import qualified Compilers.Hopc.Backend.TinyC.FromClosure as FC
 
+import Compilers.Hopc.Backend.TinyC.CPrinter
+
 import Compilers.Hopc.Compile
 import Compilers.Hopc.Error
 
@@ -69,9 +71,15 @@ main = do
 
                ir <- FC.convert c1
 
-               liftIO $ putStrLn "\n\nTinyC\n" 
+               liftIO $ putStrLn "\n\nTinyC VM\n" 
                liftIO $ putStrLn $ prettyShow ir
                liftIO $ putStrLn "\n" 
+
+               c <- printC emptyPrintC ir 
+
+               liftIO $ putStrLn "\n\nTinyC \n" 
+               liftIO $ putStrLn c
+               liftIO $ putStrLn "" 
 
         reportStatus st
 
