@@ -1,0 +1,9 @@
+
+($ typeof x :int $)
+
+($ typeof f ((:int :int) :int) $)
+
+($ foreign "display" display ((:string) :int) $)
+
+($ foreign "spawn" fork  (( ((:unit) :unit) ) :unit)  $)
+

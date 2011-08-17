@@ -1,18 +1,15 @@
 
-($ deftype (foreign "display" (display :string) :unit) $) 
-($ deftype (foreign "newline" (newline :unit) :unit) $) 
-($ deftype (foreign "sleep"   (sleep :int) :unit) $)
-($ deftype (foreign "putint"  (putint :int) :unit) $)
-($ deftype (foreign "minus"   (- :int :int) :int) $) 
-($ deftype (foreign "gt"      (> :int :int) :bool) $) 
-
-($ deftype ((main) :unit)  $)
+($ foreign "display" display ((:string) :int) $)
+($ foreign "newline" newline ((:unit) :int)   $)
+($ foreign "sleep"   sleep   ((:int) :)       $)
 
 (define (pysh s) (display s))
 
+($ typeof main ((:unit) :unit) $)
 
 (define (main)
     (display "PREVED")
+    (newline)
     (pysh "PYSH")
     (sleep 13)
     (main)

@@ -11,7 +11,8 @@ import Debug.Trace
 
 data TFunSpec = TFunForeign KId | TFunLocal deriving (Eq, Show, Data, Typeable)
 
-data HType = TVar TypeId | TInt | TStr | TBool | TUnit | TFun TFunSpec [HType] HType
+data HType = TVar TypeId | TAny TypeId
+             | TInt | TStr | TBool | TUnit | TFun TFunSpec [HType] HType
              | TAppl TypeId
              deriving (Show, Eq, Data, Typeable)
 
@@ -33,15 +34,14 @@ instance TType HType  where
 
     isVar (TAppl _) = True 
     isVar (TVar _)  = True 
+    isVar (TAny _)  = True
     isVar x         = False
 
     merge (TFun _ args1 r1) (TFun _ args2 r2) = Just $ (zip args1 args2) ++ [(r1, r2)]
---    merge (TFun _ args r1) (TAppl x) = Nothing -- Just $ [(TVar x, r1)]
-
---    merge x y = trace ("TRACE: merge " ++ (show x) ++ " " ++ (show y)) $ Nothing
     merge x y = trace ("TRACE: merge " ++ (show x) ++ " " ++ (show y)) $ Nothing
 
     typeid (TVar  s)  = s
+    typeid (TAny  s)  = s
     typeid (TAppl s)  = s
     typeid x         = "unknown"
 

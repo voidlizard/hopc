@@ -79,15 +79,14 @@ alphaConv k = evalStateT (descendBiM tr k) aInitState
           getVar s = do
               st@(AlphaConv {aEnv = env, aTp = tps}) <- get
 
-              
               let n = M.lookup s env
               let tp = M.lookup s tps
 
               trace ("TRACE: getVar " ++  s ++ " " ++ (show n) ++ " "  ++ (show tp)) $ return ()
 
               case (n, tp) of
-                (Just nv, Just t) -> lift $ addEntry False nv t
-                _                -> return ()
+                (Just nv, Just t) -> (lift $ addEntry False nv t) >> put st {aTp = M.delete nv tps}
+                _                 -> return ()
 
               return $ maybe s id $ M.lookup s env
 

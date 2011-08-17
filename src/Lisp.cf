@@ -13,7 +13,8 @@ EApply.  Exp ::= O Exp [Exp] C;
 EBegin.  Exp ::= O "begin" [Exp] C;
 ECond.   Exp ::= O "if" Exp Exp Exp C;
 
-EMacroT.  Exp ::= TypeVar;
+EMacroT.   Exp ::=  O "$" "typeof"   AtomT TType "$" C;
+EMacroFrn. Exp ::=  O "$" "foreign"  String AtomT TTypeFun "$" C;
 
 EBind.   Bind ::= O AtomT Exp C;
 EDef.    Exp  ::= Def;
@@ -23,14 +24,17 @@ DeFun.   Def ::= O "define" O AtomT [AtomT] C [Exp] C;
 
 -- Types
 
-ETypeFunForeign. TypeVar ::= O "$" "deftype" O "foreign" String O AtomT [AtomT] C AtomT C "$" C ;
-ETypeFun.        TypeVar ::= O "$" "deftype" O O AtomT [AtomT] C AtomT C "$" C ;
-ETypeVar.        TypeVar ::= O "$" "deftype" O AtomT AtomT C "$" C;
+ETypeAtom.  TType      ::= AtomT;
+ETypeFun.   TType      ::= TTypeFun;
+
+ETypeList.    TTypeList  ::= O [TType] C;
+ETypeFunDecl. TTypeFun   ::= O TTypeList TType C; 
 
 terminator Exp "";
 terminator Def "";
 terminator AtomT "";
 terminator Bind "";
+terminator TType "";
 
 position token AtomT ((["!$%&|*+-/:<=>?@^_~#"]|letter)(["!$%&|*+-/:<=>?@^_~#"]|letter|digit)* );
 

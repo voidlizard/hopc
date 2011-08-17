@@ -127,31 +127,41 @@ knorm (EStr s) = return $ KStr s
 
 knorm (EAtom (AtomT (p,bs))) = return $ KVar (toString bs)
 
-knorm m@(EMacroT (ETypeFunForeign o0 o1 str o atomt2 atomts c3 atomt c4 c)) = do
-    let n = str
-    let fn = ofatom atomt2
-    let tt = funtype (TFunForeign n) atomts atomt
-    when ((not.isJust) tt) $ error $ "BAD TYPE DECLARATION " ++ n -- FIXME
-    maybe (return ()) (lift . addEntry True fn) tt
-    e <- lift getEntries
-    liftIO $ forM_ (M.toList e) print
+knorm (EMacroT o atomt ttype c) = do
+    let n = ofatom atomt
+    let t = kTypeof ttype
+    return $ KSpecial (KTypeDef (n, t))
+
+knorm (EMacroFrn o str atomt ttypefun c) = do
+    let n = ofatom atomt
+    let t = kTypeofFn (Just str) ttypefun
+    lift $ addEntry True n t
     return KUnit
 
-knorm m@(EMacroT (ETypeFun o0 o1 o atomt2 atomts c3 atomt c4 c)) = do
+--knorm m@(EMacroT (ETypeFunForeign o0 o1 str o atomt2 atomts c3 atomt c4 c)) = do
+--    let n = str
+--    let fn = ofatom atomt2
+--    let tt = funtype (TFunForeign n) atomts atomt
+--    when ((not.isJust) tt) $ error $ "BAD TYPE DECLARATION " ++ n -- FIXME
+--    maybe (return ()) (lift . addEntry True fn) tt
+--    e <- lift getEntries
+--    liftIO $ forM_ (M.toList e) print
 
-    let n = ofatom atomt2
+--knorm m@(EMacroT (ETypeFun o0 o1 o atomt2 atomts c3 atomt c4 c)) = do
 
-    let tt = funtype TFunLocal atomts atomt
+--    let n = ofatom atomt2
 
-    when ((not.isJust) tt) $ error $ "BAD TYPE DECLARATION " ++ n -- FIXME
-    return $ KSpecial (KTypeDef (n, (fromJust tt)))
+--    let tt = funtype TFunLocal atomts atomt
 
-knorm m@(EMacroT (ETypeVar o0 o atomt1 atomt c2 c)) = do
-    let n = ofatom atomt1
-    let tp = (typeofstr.ofatom) atomt
-    case tp of
-        (Left x) -> error $ "BAD TYPE DECLARATION " ++ (show x)
-        Right t  -> return $ KSpecial (KTypeDef (n, t))
+--    when ((not.isJust) tt) $ error $ "BAD TYPE DECLARATION " ++ n -- FIXME
+--    return $ KSpecial (KTypeDef (n, (fromJust tt)))
+
+--knorm m@(EMacroT (ETypeVar o0 o atomt1 atomt c2 c)) = do
+--    let n = ofatom atomt1
+--    let tp = (typeofstr.ofatom) atomt
+--    case tp of
+--        (Left x) -> error $ "BAD TYPE DECLARATION " ++ (show x)
+--        Right t  -> return $ KSpecial (KTypeDef (n, t))
 
 --knorm (EList _ _ _ _) = error "List literals are not supported yet"
 
@@ -234,18 +244,38 @@ knormApp fn a = do
 
 ofatom (AtomT (p, bs)) = toString bs
 
-typeofstr ":unit"   = Right TUnit
-typeofstr ":string" = Right TStr
-typeofstr ":bool"   = Right TBool
-typeofstr ":int"    = Right TInt
-typeofstr x         = Left x
+kTypeof :: TType -> HType
 
-funtype :: TFunSpec -> [AtomT] -> AtomT -> Maybe HType
-funtype spec atomts atomt = do
-    let (err1, at) = partitionEithers $ map (typeofstr.ofatom) atomts
-    let rt = typeofstr $ ofatom atomt
+kTypeof (ETypeAtom atomt) = (typeofstr.ofatom) atomt
 
-    case (at, rt, err1) of
-        (x, Right r, []) -> Just $ TFun spec (x) r
-        _ -> Nothing
+kTypeof (ETypeFun tf) = kTypeofFn Nothing tf
+
+kTypeof _ = error "BAD TYPE DECL" -- FIXME
+
+kTypeofFn :: Maybe String -> TTypeFun -> HType 
+
+kTypeofFn native (ETypeFunDecl o (ETypeList _ ttypes _) ttype c) = 
+    let at = map kTypeof ttypes
+        rt = kTypeof ttype
+        ft = case native of
+               Nothing -> TFunLocal
+               Just n  -> TFunForeign n
+    in TFun ft at rt
+
+kTypeofFn _ _ = error "BAD TYPE DECL" -- FIXME
+
+typeofstr ":unit"   = TUnit
+typeofstr ":string" = TStr
+typeofstr ":bool"   = TBool
+typeofstr ":int"    = TInt
+typeofstr x         = (TAny x)
+
+--funtype :: TFunSpec -> [AtomT] -> AtomT -> Maybe HType
+--funtype spec atomts atomt = do
+--    let (err1, at) = partitionEithers $ map (typeofstr.ofatom) atomts
+--    let rt = typeofstr $ ofatom atomt
+
+--    case (at, rt, err1) of
+--        (x, Right r, []) -> Just $ TFun spec (x) r
+--        _ -> Nothing
 
