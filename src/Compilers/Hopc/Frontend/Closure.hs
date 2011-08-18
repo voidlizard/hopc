@@ -36,7 +36,7 @@ data Closure =  CInt Integer
               | CFun Fun
               | CMakeCls KId (Maybe [KId])
               | CApplCls KId [KId]
-              | CApplDir KId [KId] 
+              | CApplDir KId [KId]
              deriving (Show, Eq, Data, Typeable)
 
 
@@ -55,6 +55,8 @@ entryPoint = "ENTRY" --- TODO: options?
 
 conv2 :: KTree -> CompileM Closure
 conv2 k' = do
+
+--    k'' <- rewriteKTree k'
 
     addEntry False entryPoint (TFun TFunLocal [] TUnit) -- FIXME: hack?
     let k = KLet entryPoint  (KLambda [] k') (KApp entryPoint [])
@@ -79,7 +81,6 @@ conv2 k' = do
 
     q <- forM (M.toList (cfn s)) $ \(n, l@(KLambda args b)) -> do
         (b, s) <- runStateT (p b) $ finit
---        let fn = CFun (Fun (fname n) args (f n) (injectSelfCls n (f n) b))
         let fn = CFun (Fun (fname n) args (f n) b)
         return (fname n, fn)
 
@@ -137,6 +138,8 @@ conv2 k' = do
 
         addEntry False fn nf
 
+        liftIO $ putStrLn $ "JUST ADDED ENTRY " ++ fn ++ " " ++ (show nf)
+
         liftIO $ print (tn : tf)
 
     liftIO $ putStrLn "DONE"
@@ -145,9 +148,10 @@ conv2 k' = do
 
     where 
           p :: KTree -> C2M Closure
-          p (KLet  n e e1) = liftM2 (CLet n) (liftM snd (pb (n,e))) (p e1)
+          
+          p (KLet  n e e1) = liftM2 (CLet n) (liftM snd (pb (n,e))) (p e1) -- FIXME: BUG -- POSSIBLE make-closure at tail position
           p (KLetR b e1)   = liftM2 CLetR (mapM pb b) (p e1)
-          p (KVar n) = lift (getEntryType n) >>= cvar n 
+          p (KVar n) = lift (getEntryType n) >>= cvar n
           p (KInt v) = return $ CInt v
           p (KStr s) = return $ CStr s
           p (KCond n e1 e2) = liftM2 (CCond n) (p e1) (p e2)
@@ -161,7 +165,7 @@ conv2 k' = do
             put st {cfn = M.insert n l f}
 
           cvar :: KId -> Maybe HType -> C2M Closure 
-          cvar n (Just (TFun _ _ _)) = return $ CMakeCls n Nothing 
+          cvar n (Just (TFun _ _ _)) = return $ CMakeCls n Nothing
           cvar n (Just _) = return $ CVar n
           cvar n Nothing = lift $ throwError TypingError -- FIXME: more information
 
@@ -240,11 +244,9 @@ conv2 k' = do
           addFns (CLet n c c2) q = CLetR (q ++ [(n, c)]) c2
           addFns (CLetR b c2)  q = CLetR (q ++ b) c2
 
-          injectSelfCls n fr (CLet _ c c2) = CLetR ( (n, CMakeCls (fname n) (Just fr)) : [(n, c)]) c2
-          injectSelfCls n fr (CLetR  b c2) = CLetR ( (n, CMakeCls (fname n) (Just fr)) : b) c2
-
           init = C2 M.empty M.empty M.empty
           initf v@(C2 {cfree = fr}) f = v {cfree = f}
+
 
 fname n = "fun_" ++ n
 

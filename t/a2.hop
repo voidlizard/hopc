@@ -1,0 +1,8 @@
+($ foreign "plus" + ((:int :int) :int) $)
+($ foreign "true" true ((:unit) :bool) $)
+
+(define (moo) (if (true) (if (true) 5 6) 0 ) )
+
+(moo)
+
+

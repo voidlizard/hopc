@@ -43,6 +43,11 @@
         (display "9")
     )
 
+    (if (eq? (test) 9)
+        (display "10")
+        (display "11")
+    )
+
     (main)
 
 )

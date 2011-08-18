@@ -1,5 +1,5 @@
 
 ($ foreign "true" t ((:unit) :bool) $)
 
-(if (t) 1 2)
+(if (t) (if (t) 2 3) 1)
 

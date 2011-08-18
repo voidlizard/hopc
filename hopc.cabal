@@ -21,6 +21,7 @@ executable  hopc
                         ,array
                         ,mtl
                         ,uniplate
+                        ,hoopl
 
     hs-source-dirs:	     src
     ghc-options:         -O2 -Wall
@@ -35,6 +36,7 @@ executable test-typing
                         ,array
                         ,mtl
                         ,uniplate
+                        ,hoopl
 
     hs-source-dirs:	     src
     ghc-options:         -O2 -Wall

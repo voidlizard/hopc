@@ -1,0 +1,7 @@
+
+($ foreign "display" display ((:string) :unit) $)
+
+(define (boo) (let (q (lambda (x) (display x))) q))
+
+((boo) "QQ")
+

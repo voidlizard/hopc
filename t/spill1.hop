@@ -1,0 +1,29 @@
+($ foreign "eq" eq? ((:int :int) :bool) $)
+($ foreign "display" display ((:string) :unit) $)
+($ foreign "random" random ((:unit) :init) $)
+($ foreign "plus" + ((:int :int) :int) $)
+
+(define (test) (if (eq? (random) 1 ) 2 (if (eq? (random) 2 ) 3 0) ) )
+
+($ typeof main ((:unit) :int) $)
+
+(define (main) 
+(let ( (y (+ 1 1))  (x (+ 1 1)))
+    
+    (begin
+    (test)
+    (+ x 1)
+    (test)
+    (+ y x)
+    (test)
+    (+ y 1)
+    (test)
+    (test)
+    (display "JOPA")
+    y 
+    )
+  )
+)
+
+(main)
+

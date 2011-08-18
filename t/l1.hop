@@ -1,6 +1,5 @@
 
-($ deftype (foreign "display" (display :string) :unit) $)
-
+($ foreign "display" display ((:string) :unit ) $)
 
 (define (f1) (lambda (x) (display "JOPA")))
 

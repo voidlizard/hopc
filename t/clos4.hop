@@ -1,0 +1,6 @@
+
+($ foreign "display" display ((:string) :unit) $)
+
+
+(  (let ((y 1)) (lambda (x) (display x))) "JOPA" )
+

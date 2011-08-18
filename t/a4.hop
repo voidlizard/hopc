@@ -1,0 +1,6 @@
+($ foreign "plus" + ((:int :int) :int) $)
+($ foreign "true" true ((:unit) :bool) $)
+
+
+(if (true) 1 0)
+

@@ -1,0 +1,6 @@
+($ foreign "get" get ((:unit) :int) $)
+
+(define (boo) (let (x (get)) x))
+
+(boo)
+

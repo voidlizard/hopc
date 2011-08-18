@@ -21,29 +21,37 @@ import qualified Compilers.Hopc.Frontend.Eliminate as E
 import qualified Compilers.Hopc.Typing.Infer as I
 import Compilers.Hopc.Typing.Types
 
-import Compilers.Hopc.Backend.TinyC.IR
-import qualified Compilers.Hopc.Backend.TinyC.FromClosure as FC
-
-import Compilers.Hopc.Backend.TinyC.CPrinter
-
 import Compilers.Hopc.Compile
 import Compilers.Hopc.Error
 
 import qualified Compilers.Hopc.Frontend.KTyped as KT
 
+import Compiler.Hoopl
+
 --import Compilers.Hopc.Backend.DumbC
 import Debug.Trace
+import Text.Printf
 
 import Text.PrettyPrint.HughesPJClass (prettyShow)
+
+import Compilers.Hopc.Backend.TinyC.IR hiding (Proc)
+import qualified Compilers.Hopc.Backend.TinyC.IR as I
+import qualified Compilers.Hopc.Backend.TinyC.FromClosure as FC
+import qualified Compilers.Hopc.Backend.TinyC.Live as L
+import qualified Compilers.Hopc.Backend.TinyC.Opt as O
+import qualified Compilers.Hopc.Backend.TinyC.Regs as R
+import Compilers.Hopc.Backend.TinyC.VM
+import qualified Compilers.Hopc.Backend.TinyC.VM as V
 
 main = do
     (x:_) <- getArgs
     input x $ \s -> do
         st <- runCompile initCompile $ do
-               k <- parseTop s >>= K.kNormalizeTop  >>= dump 
+               k <- parseTop s >>= K.kNormalizeTop  -- >>= dump 
 --                               >>= A.alphaConvM    >>= dump
 
-               k' <- A.alphaConv k >>= dump
+
+               k' <- A.alphaConv k -- >>= dump
 
                constr2 <- getConstraints 
                constr <- KT.constraints k'
@@ -54,37 +62,45 @@ main = do
 
                addEntries False (map (\(a,b) -> (typeid a, b)) constr')
 
-               ee <- getEntries
---               let eee = M.toList ee
-               mapM_ (liftIO . print) (M.toList ee)
 
                k'' <- return k' >>= Cn.propagate
                                 >>= B.betaReduceM
                                 >>= L.flattenM
 
---               c1 <- C.convert k'' -- >>= E.eliminate
-               c1 <- C.conv2 k'' >>= E.eliminate
-
---               C.addTopLevelFunctions c1
+               c1 <- C.conv2 k'' >>= E.eliminate  -- >>= dump -- FIXME: make-closure in tail position
 
                liftIO $ putStrLn $ prettyShow c1
 
-               ir <- FC.convert c1
+               procs <- FC.convert c1
 
-               liftIO $ putStrLn "\n\nTinyC VM\n" 
-               liftIO $ putStrLn $ prettyShow ir
-               liftIO $ putStrLn "\n" 
+               dict <- getEntries
 
-               c <- printC emptyPrintC ir 
+               forM_ procs $ \p@(I.Proc {I.name = n, I.body = g, I.entry = e}) -> do
+--                   p'@(Proc {body = g'}) <- O.optimize O.deadAssignElim p
+                   liftIO $ putStrLn $ " --- " ++ n
+--                   liftIO $ putStrLn (showGraph show g)
 
-               liftIO $ putStrLn "\n\nTinyC \n" 
-               liftIO $ putStrLn c
-               liftIO $ putStrLn "" 
+                   x <- return $ runM $ do
+                                   live <- L.live e g
+                                   R.allocateAndFlatten dict live p
+
+                   let (Proc{V.name=n, arity=ar, slotnum=sn, V.body=ops}) = x
+                   liftIO $ putStrLn $ printf "FUNCTION: %s(%d) slotnum: %d" n ar sn
+                   forM_ ops $ \op -> do 
+                       liftIO $ putStrLn $ show op
+
+--                   qq <- O.optimize R.allocate p
+--                   liftIO $ putStrLn " --- "
+--                   liftIO $ putStrLn (showGraph show g')
+--                   liftIO $ putStrLn (showGraph show g')
+                   liftIO $ putStrLn "" 
+
+               return ()
 
         reportStatus st
 
-    where input "-" fn = BS.hGetContents stdin >>= fn
-          input x fn = BS.readFile x >>= fn
+input "-" fn = BS.hGetContents stdin >>= fn
+input x fn = BS.readFile x >>= fn
 
 dumpConstraints (Right x) = trace ("TRACE: constraints PIU PIU \n" ++ intercalate "\n" (map show x) ++ "\n") $ return x 
 dumpConstraints (Left _) = error "Type infer error"
@@ -94,8 +110,25 @@ dump x = liftIO $ putStrLn (prettyShow x) >> return x
 reportStatus (Left x)  = print x
 reportStatus (Right x) = error "finished?"
 
---test f = do
---    e <- withInput parseTop f
---    let k = either (const $ error "Parse error") K.kNormalizeTop e
---    return $ L.flatten $ B.betaReduce $ A.alphaConv k
+test f = do
+    input f $ \s -> do
+        st <- runCompile initCompile $ do
+               k <- parseTop s >>= K.kNormalizeTop  >>= A.alphaConv
+
+               constr2 <- getConstraints 
+               constr <- KT.constraints k
+               constr' <- I.inferM (constr++constr2)
+               addEntries False (map (\(a,b) -> (typeid a, b)) constr')
+
+               k' <- return k >>= Cn.propagate
+                              >>= B.betaReduceM
+                              >>= L.flattenM
+
+               c1 <- C.conv2 k' >>= E.eliminate
+               procs <- FC.convert c1
+
+               forM procs $ \p@(I.Proc {I.body = g, entry = e}) -> do
+                 return.((,) p) $ runM $ L.live e g
+
+        return st
 

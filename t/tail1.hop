@@ -1,14 +1,10 @@
 
-($ ccall "display" :string :unit $)
-($ ccall "sleep"   :int :unit $)
-($ ccall "minus"   :int :int :int $)
-($ ccall "gt"      :int :int :int $)
+($ foreign "minus" - ((:int :int) :int) $)
+($ foreign "gt"    > ((:int :int) :bool) $)
 
-(define (main x) 
-    (display "JOPA")
-    (sleep 1)
-    (if (gt x 0) (main (minus x 1)) () )
-)
+
+(define (main x) (if (> x 0) (main (- x 1)) 0) )
 
 (main 10)
+
 

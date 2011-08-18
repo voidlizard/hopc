@@ -1,0 +1,10 @@
+
+($ foreign "display" display ((:string) :unit) $)
+
+(define (moo) (display "MOO"))
+
+(define (boo) (display "BOO"))
+
+(moo)
+(boo)
+

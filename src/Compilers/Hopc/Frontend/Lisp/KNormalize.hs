@@ -59,11 +59,11 @@ knormSeq :: [Exp] -> KNormStateM KTree
 knormSeq [] = return KUnit
 
 knormSeq seq = do
-
     let (last:all) = reverse seq
     es <- mapM knormN (reverse all)
     (t, last') <- knormN last
     lastNorm <- knormTail last'
+
     if es == []
         then rewriteBiM r $ if isDef last then KLetR [(t, last')] KUnit else lastNorm
         else rewriteBiM r $ if isDef last then KLetR (es++[(t, last')]) KUnit else KLetR es lastNorm
@@ -91,9 +91,9 @@ kInitState = KNormState { tmpId = 0 }
 
 tmp :: String -> String -> KNormStateM String 
 tmp prefix s = do
-    (KNormState {tmpId = i}) <- get
-    let v = printf "%s_%s%d" prefix s i
-    put KNormState { tmpId = i+1 }
+    t <- lift $ nextTmp
+    let v = printf "%s_%s%d" prefix s t 
+    put KNormState { tmpId = t }
     return v
 
 withArg (AtomT (p, bs)) = (toString bs)
@@ -138,47 +138,10 @@ knorm (EMacroFrn o str atomt ttypefun c) = do
     lift $ addEntry True n t
     return KUnit
 
---knorm m@(EMacroT (ETypeFunForeign o0 o1 str o atomt2 atomts c3 atomt c4 c)) = do
---    let n = str
---    let fn = ofatom atomt2
---    let tt = funtype (TFunForeign n) atomts atomt
---    when ((not.isJust) tt) $ error $ "BAD TYPE DECLARATION " ++ n -- FIXME
---    maybe (return ()) (lift . addEntry True fn) tt
---    e <- lift getEntries
---    liftIO $ forM_ (M.toList e) print
-
---knorm m@(EMacroT (ETypeFun o0 o1 o atomt2 atomts c3 atomt c4 c)) = do
-
---    let n = ofatom atomt2
-
---    let tt = funtype TFunLocal atomts atomt
-
---    when ((not.isJust) tt) $ error $ "BAD TYPE DECLARATION " ++ n -- FIXME
---    return $ KSpecial (KTypeDef (n, (fromJust tt)))
-
---knorm m@(EMacroT (ETypeVar o0 o atomt1 atomt c2 c)) = do
---    let n = ofatom atomt1
---    let tp = (typeofstr.ofatom) atomt
---    case tp of
---        (Left x) -> error $ "BAD TYPE DECLARATION " ++ (show x)
---        Right t  -> return $ KSpecial (KTypeDef (n, t))
-
---knorm (EList _ _ _ _) = error "List literals are not supported yet"
-
 knorm (ELambda _ _ args _ e _) = do
     let args' = map withArg args
     e' <- knorm e
     return $ KLambda args' e'
-
---knorm (ELetM p1 p2 binds p3 el@(ELambda _ _ args _ e _) p4) = do
---    error "GOT LAMBDA"
---    el' <- knorm el
---    binds' <- forM binds $ \(EBind _ (AtomT (_, bs)) eb _) -> 
---                do let t  = toString bs
---                   eb' <- knorm eb
---                   return (t, eb')
---    e' <- knorm e
---    return $ KLetR binds' e'
 
 knorm (ELetM p1 p2 binds p3 e p4) = do
     binds' <- forM binds $ \(EBind _ (AtomT (_, bs)) eb _) -> 
@@ -187,13 +150,6 @@ knorm (ELetM p1 p2 binds p3 e p4) = do
                    return (t, eb')
     e' <- knorm e
     return $ KLetR binds' e'
-
---knorm (ELet p1 p2 (AtomT (p21, bs)) eb p3 el@(ELambda _ _ args _ e _) p4) = do
---    error "GOT LAMBDA"
---    eb' <- knorm eb
---    e'  <- knorm e
---    let tmpname = toString bs
---    return $ KLet tmpname eb' e'
 
 knorm (ELet p1 p2 (AtomT (p21, bs)) eb p3 e p4) = do
     eb' <- knorm eb
@@ -217,6 +173,7 @@ knorm (EDef (DeFun _ _ (AtomT (p,bs)) args _ e _)) = do
     return $ KLambda args' seq
 
 knorm (EDef (DefExp _ (AtomT (p,bs)) e _)) = do
+    error "WTF?"
     let s = toString bs
     e' <- knorm e
     return e'
@@ -269,13 +226,4 @@ typeofstr ":string" = TStr
 typeofstr ":bool"   = TBool
 typeofstr ":int"    = TInt
 typeofstr x         = (TAny x)
-
---funtype :: TFunSpec -> [AtomT] -> AtomT -> Maybe HType
---funtype spec atomts atomt = do
---    let (err1, at) = partitionEithers $ map (typeofstr.ofatom) atomts
---    let rt = typeofstr $ ofatom atomt
-
---    case (at, rt, err1) of
---        (x, Right r, []) -> Just $ TFun spec (x) r
---        _ -> Nothing
 

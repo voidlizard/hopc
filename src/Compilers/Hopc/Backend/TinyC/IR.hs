@@ -1,77 +1,56 @@
-{-# LANGUAGE EmptyDataDecls, OverloadedStrings, DeriveDataTypeable  #-}
+{-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE RankNTypes, ScopedTypeVariables, GADTs, EmptyDataDecls, PatternGuards, TypeFamilies, NamedFieldPuns #-}
 
 module Compilers.Hopc.Backend.TinyC.IR where
 
-import Data.Data
-import Data.Typeable
+import Compiler.Hoopl
+import Data.List (intercalate)
+import Control.Monad.Trans
+import Compilers.Hopc.Compile
+import Compilers.Hopc.Id (KId)
+import Compilers.Hopc.Backend.TinyC.Lit
 
-import Data.Generics.PlateData
-import Text.PrettyPrint.HughesPJClass
-import Text.Printf
+type M = CheckingFuelMonad (SimpleUniqueMonad) 
 
-type LabelId = String
-type RId = Int
+data CallT = Direct KId  | Closure KId
 
-data IR = IR [Instr] deriving (Eq, Show, Data, Typeable)
+data Insn e x where
+    Label   :: Label ->                     Insn C O
+    Call    :: Label -> CallT -> [KId] -> KId -> Insn O C 
+    MkClos  :: KId   -> [KId] -> KId ->     Insn O O
+    Const   :: Lit   -> KId   ->            Insn O O
+    Assign  :: KId   -> KId   ->            Insn O O
+    Branch  :: Label          ->            Insn O C
+    Cond    :: KId   -> Label -> Label ->   Insn O C
+    Return  :: KId            ->            Insn O C
 
-data R = R RId deriving (Eq, Show, Data, Typeable)
+instance NonLocal Insn where
+    entryLabel (Label l)      = l
+    successors (Branch l)     = [l]
+    successors (Cond _ t f)   = [t, f]
+    successors (Return _)     = []
+    successors (Call l _ _ _)   = [l]
+--    successors (MkClos _ _ _) = []
+--    successors (Const _ _)    = []
+--    successors (Assign _ _)   = []
 
-data JumpCnd  = JumpFake R deriving (Eq, Show, Data, Typeable)
 
-type Desc = String
+data Proc = Proc { name :: KId, args :: [KId], entry :: Label, body :: Graph Insn C C }
 
-data Instr = I Op Desc
-             deriving (Eq, Show, Data, Typeable)
+runM :: M a -> a
+runM m = runSimpleUniqueMonad $ runWithFuel 0 m
 
-data Op =   MOV   R R
-          | CALL  LabelId LabelId
-          | CALL_FOREIGN LabelId [R]
-          | CALL_LOCAL   LabelId [R]
-          | CALL_CLOSURE R [R]
-          | MAKE_CLOSURE LabelId [R]
-          | CONST LabelId R
-          | CJUMP JumpCnd LabelId
-          | JUMP  LabelId
-          | LABEL LabelId
-          | RET
-          | NOP   
-          deriving (Eq, Show, Data, Typeable)
+instance Show (Insn e x) where
+  show (Label lbl)      = show lbl ++ ":"
+  show (Call _ (Direct  n) a t) = ind $ "call-direct " ++ n ++ " " ++ (intercalate ", " a)  ++ " -> " ++ t
+  show (Call _ (Closure n) a t) = ind $ "call-closure " ++ n ++ " " ++  (intercalate ", " a)  ++ " -> " ++ t
+  show (MkClos x vs v) = ind $ "make-closure " ++ x ++ " " ++ (intercalate ", " vs) ++ " -> " ++  v
+  show (Const (LInt n) v) = ind $ "iconst " ++ (show n) ++ " " ++ v
+  show (Const (LStr s) v) = ind $ "sconst " ++ (show s) ++ " " ++ v 
+  show (Assign a b)       = ind $ "assign " ++ a ++ " " ++ b
+  show (Branch l)         = ind $ "branch " ++ (show l)
+  show (Cond v l1 l2)     = ind $ "cond-branch " ++ v ++ " " ++ (show l1) ++ " " ++ (show l2)
+  show (Return v)          = ind $ "return " ++ v 
 
-op :: Op -> Instr
-op x = I x ""
-
-opc :: Op -> Desc -> Instr
-opc x s = I x s
-
-instance Pretty IR where
-    pPrintPrec l p (IR op) = vcat $ map (pPrintPrec l p) op
-
-instance Pretty Instr where
-    pPrintPrec l p (I (LABEL l1) dsc) = text (l1++":") $$ nest 42 (text " ;" <+> text dsc)
-    pPrintPrec l p (I op@(RET) dsc)   = text "" $$ nest 10 (pPrintPrec l p op
-                                                $$ nest 32 (text " ;" <+> text dsc))
-                                                $+$ nest 0 (text "")
-
-    pPrintPrec l p (I op dsc) = text "" 
-                                $$ nest 10 (pPrintPrec l p op $$ nest 32 (text " ;" <+> text dsc))
-
-instance Pretty R where
-    pPrintPrec l p (R id) = text (printf "r%s" (show id))
-
-instance Pretty JumpCnd where
-    pPrintPrec l p (JumpFake r) = prettyParen True $ text "some" <+> pPrintPrec l p r
-
-instance Pretty Op where
-    pPrintPrec l p (MOV r1 r2)  = text "mov"     <+> (pPrintPrec l p r1) <+> (pPrintPrec l p r2)
-    pPrintPrec l p (CALL l1 l2) = text "call"    <+> text l1
-    pPrintPrec l p (CALL_FOREIGN l1 r) = text "call-foreign" <+> text l1 <+> fsep (map (pPrintPrec l p) r)
-    pPrintPrec l p (CALL_LOCAL l1 r) = text "call-local" <+> text l1 <+> fsep (map (pPrintPrec l p) r)
-    pPrintPrec l p (CALL_CLOSURE r rs) = text "call-closure" <+> pPrintPrec l p r <+> fsep (map (pPrintPrec l p) rs)
-    pPrintPrec l p (MAKE_CLOSURE n rs) = text "make-closure" <+> text n <+> fsep (map (pPrintPrec l p) rs)
-    pPrintPrec l p (CONST l1 r) = text "const"   <+> text l1 <+> pPrintPrec l p r
-    pPrintPrec l p (CJUMP c l1) = text "jmp-cnd" <+> (pPrintPrec l p c) <+> text l1
-    pPrintPrec l p (JUMP l1)    = text "jmp"     <+> text l1
-    pPrintPrec l p (LABEL l1)   = text "label"   <+> text l1 <+> text ":"
-    pPrintPrec l p (NOP)        = text "nop"
-    pPrintPrec l p (RET)        = text "ret"
-
+ind :: String -> String
+ind x = "    " ++ x

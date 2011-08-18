@@ -1,0 +1,159 @@
+($ foreign "eq" eq? ((:int :int) :bool) $)
+($ foreign "display" display ((:string) :unit) $)
+($ foreign "random" random ((:unit) :init) $)
+
+(define (test) (if (eq? (random) 1 ) 2 (if (eq? (random) 2 ) 3 0) ) )
+
+($ typeof main ((:unit) :unit) $)
+
+(define (main)
+
+    (if (eq? (test) 2)
+        (display "foo")
+        (display "bar")
+    )
+
+    (if (eq? (test) 3)
+        (display "piu")
+        (display "paff")
+    )
+
+    (if (eq? (test) 4)
+        (display "bing")
+        (display "bang")
+    )
+
+    (if (eq? (test) 5)
+        (display "bong")
+        (display "bdysh")
+    )
+
+    (if (eq? (test) 6)
+        (display "moo")
+        (display "goo")
+    )
+
+    (if (eq? (test) 7)
+        (display "seven")
+        (display "not seven")
+    )
+
+    (if (eq? (test) 8)
+        (display "8")
+        (display "9")
+    )
+
+    (if (eq? (test) 2)
+        (display "foo")
+        (display "bar")
+    )
+
+    (if (eq? (test) 3)
+        (display "piu")
+        (display "paff")
+    )
+
+    (if (eq? (test) 4)
+        (display "bing")
+        (display "bang")
+    )
+
+    (if (eq? (test) 5)
+        (display "bong")
+        (display "bdysh")
+    )
+
+    (if (eq? (test) 6)
+        (display "moo")
+        (display "goo")
+    )
+
+    (if (eq? (test) 7)
+        (display "seven")
+        (display "not seven")
+    )
+
+    (if (eq? (test) 8)
+        (display "8")
+        (display "9")
+    )
+
+    (if (eq? (test) 2)
+        (display "foo")
+        (display "bar")
+    )
+
+    (if (eq? (test) 3)
+        (display "piu")
+        (display "paff")
+    )
+
+    (if (eq? (test) 4)
+        (display "bing")
+        (display "bang")
+    )
+
+    (if (eq? (test) 5)
+        (display "bong")
+        (display "bdysh")
+    )
+
+    (if (eq? (test) 6)
+        (display "moo")
+        (display "goo")
+    )
+
+    (if (eq? (test) 7)
+        (display "seven")
+        (display "not seven")
+    )
+
+    (if (eq? (test) 8)
+        (display "8")
+        (display "9")
+    )
+
+    (if (eq? (test) 2)
+        (display "foo")
+        (display "bar")
+    )
+
+    (if (eq? (test) 3)
+        (display "piu")
+        (display "paff")
+    )
+
+    (if (eq? (test) 4)
+        (display "bing")
+        (display "bang")
+    )
+
+    (if (eq? (test) 5)
+        (display "bong")
+        (display "bdysh")
+    )
+
+    (if (eq? (test) 6)
+        (display "moo")
+        (display "goo")
+    )
+
+    (if (eq? (test) 7)
+        (display "seven")
+        (display "not seven")
+    )
+
+    (if (eq? (test) 8)
+        (display "8")
+        (display "9")
+    )
+
+
+
+
+    (main)
+
+)
+
+(main)
+

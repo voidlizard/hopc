@@ -18,7 +18,10 @@ data Entry = Entry { eType :: HType, eTop :: Bool } deriving (Show)
 
 type Dict = M.Map KId Entry 
 
-data CompileState = CompileState Dict (Maybe KId) deriving (Show)
+type TDict = M.Map KId HType
+
+data CompileState = CompileState { cdict :: Dict, centry :: Maybe KId, ctmpid :: Int }
+                    deriving (Show)
 
 newtype CompileM a = CompileM {
     runT :: (StateT CompileState (ErrorT CompileError IO)) a
@@ -31,23 +34,23 @@ runCompile :: CompileState
 
 runCompile init f = runErrorT (runStateT (runT f) init)
 
-initCompile = CompileState M.empty Nothing
+initCompile = CompileState M.empty Nothing 0
+
+retvalVariable = "RETVAL"
+activationRecordVariable = "CLOSURE"
 
 addEntry :: Bool -> KId -> HType -> CompileM ()
 addEntry tp n t = do 
-    (CompileState d e) <- get
-    let d' = M.insert n (Entry {eType = t, eTop = tp}) d
-    put (CompileState d' e)
+    c@(CompileState { cdict = d }) <- get
+    put c {cdict = M.insert n (Entry {eType = t, eTop = tp}) d}
 
 addEntries :: Bool -> [(KId, HType)] -> CompileM ()
 addEntries t ls = do
     let dict = M.fromList (map (\(a, b) -> (a, Entry b t)) ls)
-    modify ( \(CompileState d e) -> CompileState (M.union d dict) e)
+    modify ( \s@(CompileState { cdict = d }) -> s {cdict = M.union d dict})
 
 getEntry :: KId -> CompileM (Maybe Entry)
-getEntry n = do
-    (CompileState d _) <- get
-    return $ M.lookup n d
+getEntry n = gets ( M.lookup n . cdict )
 
 getEntryType :: KId -> CompileM (Maybe HType)
 getEntryType n = do
@@ -55,9 +58,7 @@ getEntryType n = do
     return $ maybe Nothing (Just . eType) e
 
 getEntries :: CompileM (M.Map KId HType)
-getEntries = do 
-    (CompileState d _) <- get
-    return $ M.map eType d
+getEntries = gets ((M.map eType).cdict)
 
 getConstraints :: CompileM [(HType, HType)]
 getConstraints = do
@@ -65,22 +66,21 @@ getConstraints = do
     return $ map (\(a,b) -> (TVar a, b)) $ M.toList e
 
 entryList :: CompileM [(KId,Entry)]
-entryList = do 
-    (CompileState d _) <- get
-    return $ M.toList d
+entryList = gets (M.toList.cdict)
 
 names :: CompileM (S.Set KId)
-names = do
-    (CompileState d _) <- get
-    return $ M.keysSet d
+names = gets (M.keysSet . cdict)
 
 setEntryPoint :: KId -> CompileM ()
-setEntryPoint s = do
-    (CompileState d e) <- get
-    put (CompileState d (Just s))
+setEntryPoint s = modify (\cs -> cs { centry = Just s })
 
 getEntryPoint :: CompileM (Maybe KId)
-getEntryPoint = do
-    (CompileState _ e) <- get
-    return e
+getEntryPoint = gets centry
+
+nextTmp :: CompileM Int
+nextTmp = do
+    t <- gets ctmpid
+    modify (\s@(CompileState{ctmpid = n}) -> s {ctmpid = succ n})
+    return t
+
 
