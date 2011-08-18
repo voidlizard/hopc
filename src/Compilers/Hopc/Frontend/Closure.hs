@@ -36,7 +36,7 @@ data Closure =  CInt Integer
               | CFun Fun
               | CMakeCls KId (Maybe [KId])
               | CApplCls KId [KId]
-              | CApplDir KId [KId] 
+              | CApplDir KId [KId]
              deriving (Show, Eq, Data, Typeable)
 
 

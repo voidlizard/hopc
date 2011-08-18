@@ -40,7 +40,12 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
 
     let value = maybe v (\l -> [op (LABEL l0), opc (JUMP l) "entry point"] ++ (skipEntry l v)) lbl
 
-    return $ IR value
+--    let optimized = adhocMov2 $ adhocMov1 value
+--    let optimized = adhocMov1 value
+
+--    let optimized = value
+
+    return $ IR value 
 
     where 
           tr :: R -> Closure -> ConvM [Instr]
@@ -136,10 +141,12 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
             (code, (Conv{lbl=nl, funlbl=nfl})) <- lift $ flip runStateT newst $ do
                 mapM_ addReg (args ++ free)
                 tr retvalReg k
+
+            let optimized = adhocMov2 $ adhocMov1 code
  
             modify (\x -> x{lbl=nl, funlbl=nfl})
 
-            return $ opc (LABEL fstart) fn : code ++ [opc RET "ret"]
+            return $ opc (LABEL fstart) fn : optimized ++ [opc RET "ret"]
 
 
           trB (n, e) = addReg n >>= flip tr e
@@ -223,5 +230,55 @@ convert k = trace "TRACE: FromClosure :: convert " $ do
 
           mov (R a) (R b) dsc | a == b = []
           mov a b dsc = [opc (MOV a b) dsc]
+
+
+adhocMov1 :: [Instr] -> [Instr]
+adhocMov1 a = scan a
+
+    where scan ((I x1@(MOV (R a1) (R b1)) _) : x@(I (MOV (R a2) (R b2)) _)  : xs )  | b1 == a2  = 
+            scan ((I (MOV (R a1) (R b2)) ""):xs)
+
+          scan (x:xs) = x : scan xs
+
+          scan [] = []
+
+
+adhocMov2 :: [Instr] -> [Instr]
+adhocMov2 a = scanMov a
+
+    where scanMov ((x@(I (MOV (R a1) (R b1)) _)):xs) = 
+            let (b, rs) = scan (a1,b1) ([], xs)
+            in x : b ++ scanMov rs
+
+          scanMov (x:xs) = x : scanMov xs
+
+          scanMov [] = []
+
+          scan :: (RId,RId) -> ([Instr], [Instr]) ->  ([Instr], [Instr])
+          
+          scan rr (a, x@(I (CALL_FOREIGN _ _) _ ):xs) = (a ++ [repl rr x], xs)
+
+          scan rr (a, x@(I (CALL_LOCAL _ _) _):xs) = (a ++ [repl rr x], xs)
+
+          scan rr (a, x@(I (CALL_CLOSURE _ _) _ ):xs) = (a ++ [repl rr x], xs)
+
+          scan rr (a, x@(I (MOV (R a1) (R b1)) _):xs) | b1 /= (fst rr) = scan rr (a++[x], xs)
+
+          scan rr (a, x@(I (CJUMP _  _) _):xs)  = (a ++ [repl rr x], xs)
+       
+          scan rr (a, x@(I (CONST _  _) _):xs)  = scan rr (a ++ [x], xs)
+
+          scan rr (a, x:xs) = (a, x:xs)
+
+          repl rr (I (CALL_LOCAL l regs) d) =   I (CALL_LOCAL l (map (reg rr) regs) ) d
+          repl rr (I (CALL_FOREIGN n regs) d) = I (CALL_FOREIGN n (map (reg rr) regs) ) d
+          repl rr (I (CALL_CLOSURE rc regs) d) = I (CALL_CLOSURE (reg rr rc) (map (reg rr) regs)) d
+          repl rr (I (CJUMP (JumpFake r) l) d) = (I (CJUMP (JumpFake (reg rr r)) l) d)
+          repl rr x = x
+--          repl rr x = trace ("TRACE: repl " ++ (show rr) ++ " " ++ (show x)) x 
+
+          reg (r1,r2) (R x) | r2 == x = (R r1)
+                            | otherwise = (R x)
+
 
 
