@@ -21,6 +21,7 @@
 
 	(begin
 	  (display x1)
+	  (display x2)
 	  (display x3)
 	  (display x4)
 	  (display x5)

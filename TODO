@@ -1,4 +1,5 @@
 
+TODO: Удалить VM, FromClosure, FromVM. Строить IR непосредственно из Closure
 TODO: Обработка неизвестых переменных
 
 
