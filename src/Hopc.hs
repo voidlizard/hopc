@@ -32,8 +32,11 @@ import Compilers.Hopc.Error
 
 import qualified Compilers.Hopc.Frontend.KTyped as KT
 
-import Compilers.Hopc.Backend.TinyC.IR as IR
-import Compilers.Hopc.Backend.TinyC.FromVM as FV
+import qualified Compilers.Hopc.Backend.TinyC.IR as IR
+import qualified Compilers.Hopc.Backend.TinyC.FromVM as FV
+
+--import Compilers.Hopc.Backend.TinyC.Live
+import qualified Compilers.Hopc.Backend.TinyC.Opt as O
 
 import Compiler.Hoopl
 
@@ -92,18 +95,17 @@ main = do
                forM_ procs $ \(V.Proc n ins) -> do
                    b <- FC.split s ins
 --                   liftIO $ print b
-                   IR.Proc { IR.body = g  } <- FV.convertIR n b
+                   p@(IR.Proc { IR.entry = e, IR.body = g  }) <- FV.convertIR n b
+
                    liftIO $ putStrLn "" >> putStrLn ("F_" ++ n) >> putStrLn "----"
                    liftIO $ putStrLn (showGraph show g)
+
+                   IR.Proc { IR.body = g'  } <- O.opt p
+
+                   liftIO $ putStrLn "" >> putStrLn ("F_" ++ n) >> putStrLn "----"
+                   liftIO $ putStrLn (showGraph show g')
+
                    return ()
---                   undefined
---                   lift $ FV. 
---                   liftIO $ pu
-               
-
---               let s = FV.split ins
-
---               mapM_ (liftIO.print.(map prettyShow)) s
 
                return ()
 

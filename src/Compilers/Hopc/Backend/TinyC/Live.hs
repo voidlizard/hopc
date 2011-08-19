@@ -41,7 +41,7 @@ liveness = mkBTransfer live
     live (CallF _ rs l)   f = addUses (S.delete retvalReg $ fact f l) rs
     live (CallC r rs l)   f = addUses (S.delete retvalReg $ fact f l) (r:rs)
     live (MClos _ rs)     f = addUses f rs
-    live (Return)         _ = fact_bot liveLattice
+    live (Return)         _ = addUses (fact_bot liveLattice) [retvalReg]
 
     fact :: FactBase (S.Set R) -> Label -> Live
     fact f l = fromMaybe S.empty $ lookupFact l f
@@ -49,11 +49,11 @@ liveness = mkBTransfer live
     addUses :: Live -> [R] -> Live
     addUses s rs = s `S.union` S.fromList rs
 
---deadAsstElim :: forall m . FuelMonad m => BwdRewrite m Insn Live
---deadAsstElim = mkBRewrite d
---  where
---    d :: Insn e x -> Fact x Live -> m (Maybe (Graph Insn e x))
---    d (Assign x _) live
---        | not (x `S.member` live) = return $ Just emptyGraph
---    d _ _ = return Nothing
+deadAsstElim :: forall m . FuelMonad m => BwdRewrite m Insn Live
+deadAsstElim = mkBRewrite d
+  where
+    d :: Insn e x -> Fact x Live -> m (Maybe (Graph Insn e x))
+    d (Store r1 x) live
+        | not (x `S.member` live) = return $ Just emptyGraph
+    d _ _ = return Nothing
 
