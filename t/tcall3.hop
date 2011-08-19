@@ -1,5 +1,5 @@
 
-($ ccall "display" :string :unit $)
+($ foreign "display" display ((:string) :unit) $) 
 
 (define (mutapaka) (display "mutapaka"))
 

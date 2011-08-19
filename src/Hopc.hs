@@ -21,7 +21,8 @@ import qualified Compilers.Hopc.Frontend.Eliminate as E
 import qualified Compilers.Hopc.Typing.Infer as I
 import Compilers.Hopc.Typing.Types
 
-import Compilers.Hopc.Backend.TinyC.IR
+import Compilers.Hopc.Backend.TinyC.VM
+import qualified Compilers.Hopc.Backend.TinyC.VM as V
 import qualified Compilers.Hopc.Backend.TinyC.FromClosure as FC
 
 import Compilers.Hopc.Backend.TinyC.CPrinter
@@ -30,6 +31,11 @@ import Compilers.Hopc.Compile
 import Compilers.Hopc.Error
 
 import qualified Compilers.Hopc.Frontend.KTyped as KT
+
+import Compilers.Hopc.Backend.TinyC.IR as IR
+import Compilers.Hopc.Backend.TinyC.FromVM as FV
+
+import Compiler.Hoopl
 
 --import Compilers.Hopc.Backend.DumbC
 import Debug.Trace
@@ -69,17 +75,38 @@ main = do
 
                liftIO $ putStrLn $ prettyShow c1
 
-               ir <- FC.convert c1
+               vm@(VM ins) <- FC.convertVM c1
 
                liftIO $ putStrLn "\n\nTinyC VM\n" 
-               liftIO $ putStrLn $ prettyShow ir
+               liftIO $ putStrLn $ prettyShow vm 
                liftIO $ putStrLn "\n" 
 
-               c <- printC emptyPrintC ir 
+               c <- printC emptyPrintC vm 
 
                liftIO $ putStrLn "\n\nTinyC \n" 
                liftIO $ putStrLn c
-               liftIO $ putStrLn "" 
+               liftIO $ putStrLn ""
+
+               
+               (procs, s) <- FC.convert c1
+               forM_ procs $ \(V.Proc n ins) -> do
+                   b <- FC.split s ins
+--                   liftIO $ print b
+                   IR.Proc { IR.body = g  } <- FV.convertIR n b
+                   liftIO $ putStrLn "" >> putStrLn ("F_" ++ n) >> putStrLn "----"
+                   liftIO $ putStrLn (showGraph show g)
+                   return ()
+--                   undefined
+--                   lift $ FV. 
+--                   liftIO $ pu
+               
+
+--               let s = FV.split ins
+
+--               mapM_ (liftIO.print.(map prettyShow)) s
+
+               return ()
+
 
         reportStatus st
 

@@ -1,7 +1,7 @@
 {-# LANGUAGE EmptyDataDecls, DeriveDataTypeable  #-}
 module Compilers.Hopc.Backend.TinyC.CPrinter where
 
-import Compilers.Hopc.Backend.TinyC.IR
+import Compilers.Hopc.Backend.TinyC.VM
 import Compilers.Hopc.Compile
 
 import Data.List
@@ -15,8 +15,8 @@ data PrintC = PrintC { includes :: [String] }
 
 emptyPrintC = PrintC []
 
-printC :: PrintC -> IR -> CompileM String
-printC x (IR instr) = do
+printC :: PrintC -> VM -> CompileM String
+printC x (VM instr) = do
 
     let ls = M.fromList $ zipWith (,) (foldr wl [] instr) [0..]
     let numOf l = M.lookup l ls
@@ -32,11 +32,11 @@ printC x (IR instr) = do
           line (I (RET)_ )     = ret
           line (I (JUMP n)_ )  = jmp n
           line (I (MOV r1 r2) _ ) = mov r1 r2
-          line (I (CALL_FOREIGN n rs) _ ) = callForeign n rs
-          line (I (CALL_LOCAL n rs) _ ) = callLocal n rs
+          line (I (CALL_FOREIGN n rs _) _ ) = callForeign n rs
+          line (I (CALL_LOCAL n rs _) _ ) = callLocal n rs
           line (I (CONST l r) _ ) = const l r
 
-          line (I (CJUMP (JumpFake r) l) _ ) = indent ++ printf "IFTRUE(%s, %s);" (reg r) l
+          line (I (CJUMP (JumpFake r) l0 l) _ ) = indent ++ printf "IFTRUE(%s, %s);" (reg r) l
 
           line _               = indent ++ "UNSUPPORTED;"
 
