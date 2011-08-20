@@ -145,7 +145,7 @@ conv2 k' = do
 
     where 
           p :: KTree -> C2M Closure
-          p (KLet  n e e1) = liftM2 (CLet n) (liftM snd (pb (n,e))) (p e1)
+          p (KLet  n e e1) = liftM2 (CLet n) (liftM snd (pb (n,e))) (p e1) -- FIXME: BUG -- POSSIBLE make-closure at tail position
           p (KLetR b e1)   = liftM2 CLetR (mapM pb b) (p e1)
           p (KVar n) = lift (getEntryType n) >>= cvar n 
           p (KInt v) = return $ CInt v
@@ -161,7 +161,7 @@ conv2 k' = do
             put st {cfn = M.insert n l f}
 
           cvar :: KId -> Maybe HType -> C2M Closure 
-          cvar n (Just (TFun _ _ _)) = return $ CMakeCls n Nothing 
+          cvar n (Just (TFun _ _ _)) = return $ CMakeCls n Nothing
           cvar n (Just _) = return $ CVar n
           cvar n Nothing = lift $ throwError TypingError -- FIXME: more information
 

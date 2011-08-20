@@ -52,6 +52,7 @@ main = do
                k <- parseTop s >>= K.kNormalizeTop  >>= dump 
 --                               >>= A.alphaConvM    >>= dump
 
+
                k' <- A.alphaConv k >>= dump
 
                constr2 <- getConstraints 
@@ -72,7 +73,9 @@ main = do
                                 >>= L.flattenM
 
 --               c1 <- C.convert k'' -- >>= E.eliminate
-               c1 <- C.conv2 k'' >>= E.eliminate
+               c1 <- C.conv2 k'' >>= E.eliminate >>= dump
+
+               error "stop"
 
 --               C.addTopLevelFunctions c1
 
@@ -86,16 +89,15 @@ main = do
 
                c <- printC emptyPrintC vm 
 
-               liftIO $ putStrLn "\n\nTinyC \n" 
-               liftIO $ putStrLn c
-               liftIO $ putStrLn ""
+--               liftIO $ putStrLn "\n\nTinyC \n" 
+--               liftIO $ putStrLn c
+--               liftIO $ putStrLn ""
 
-               
                (procs, s) <- FC.convert c1
                forM_ procs $ \(V.Proc n ins) -> do
                    b <- FC.split s ins
 --                   liftIO $ print b
-                   p@(IR.Proc { IR.entry = e, IR.body = g  }) <- FV.convertIR n b
+                   p@(IR.Proc {IR.entry = e, IR.body = g}) <- FV.convertIR n b
 
                    liftIO $ putStrLn "" >> putStrLn ("F_" ++ n) >> putStrLn "----"
                    liftIO $ putStrLn (showGraph show g)
