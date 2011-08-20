@@ -1,5 +1,8 @@
 
+FIXME: make-closure  в хвостовой позиции после closure convetion. Что-то с этим сделать.
+
 TODO: Удалить VM, FromClosure, FromVM. Строить IR непосредственно из Closure
+
 TODO: Обработка неизвестых переменных
 
 
