@@ -56,18 +56,17 @@ main = do
                constr2 <- getConstraints 
                constr <- KT.constraints k'
 
-               dumpConstraints (Right (constr2++constr))
+--               dumpConstraints (Right (constr2++constr))
 
                constr' <- I.inferM (constr++constr2)
 
                addEntries False (map (\(a,b) -> (typeid a, b)) constr')
 
-
                k'' <- return k' >>= Cn.propagate
                                 >>= B.betaReduceM
                                 >>= L.flattenM
 
-               c1 <- C.conv2 k'' >>= E.eliminate  -- >>= dump -- FIXME: make-closure in tail position
+               c1 <- C.conv2 k'' >>= E.eliminate -- >>= dump -- FIXME: make-closure in tail position
 
                liftIO $ putStrLn $ prettyShow c1
 
@@ -82,7 +81,8 @@ main = do
 
                    x <- return $ runM $ do
                                    live <- L.live e g
-                                   R.allocateAndFlatten dict live p
+                                   alloc <- R.allocateLinearScan dict live p
+                                   fromIR dict alloc p
 
                    let (Proc{V.name=n, arity=ar, slotnum=sn, V.body=ops}) = x
                    liftIO $ putStrLn $ printf "FUNCTION: %s(%d) slotnum: %d" n ar sn

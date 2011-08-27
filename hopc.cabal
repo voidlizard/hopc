@@ -21,6 +21,7 @@ executable  hopc
                         ,array
                         ,mtl
                         ,uniplate
+                        ,vector
                         ,hoopl
 
     hs-source-dirs:	     src
@@ -36,6 +37,7 @@ executable test-typing
                         ,array
                         ,mtl
                         ,uniplate
+                        ,vector
                         ,hoopl
 
     hs-source-dirs:	     src
