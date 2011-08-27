@@ -191,7 +191,7 @@ allocateAndFlatten dict live p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.a
 --                trace ("\n\nSPILL BEFORE CALL " ++ show ra ++ " " ++ show lr) $ return ()
 
 --                call <- callRet rt r (list1M . V.CallL l n rs)
-                call <- callRet rt r (spillAlive l . list1 . V.CallL l n rs)
+                call <- callRet rt r (spillAlive lr l . list1 . V.CallL l n rs)
                 return call
 --                re <- get
 --                ra <- gets regAlloc
@@ -240,14 +240,14 @@ allocateAndFlatten dict live p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.a
             callRet TUnit v f = f RVoid
             callRet _     v f = allocate v $ f . RReg
 
-            spillAlive :: Label -> [V.Op] -> RegEnvM [V.Op]
-            spillAlive l v = do
-              liveR  <- gets (regenvLiveRegs l)
+            spillAlive :: [(KId, R)] -> Label -> [V.Op] -> RegEnvM [V.Op]
+            spillAlive lr l v = do
+--              liveR  <- gets (regenvLiveRegs l)
               spills <- gets regSpilled >>= return . M.map fst
 
               ra <- gets regAlloc
 
-              let toSpill = (M.fromList liveR) `M.difference` spills
+              let toSpill = (M.fromList lr) `M.difference` spills
 
 --              trace ("SPILL ALIVE " ++ show l ++ (show liveR)) $ return ()
 --              trace ("SPILLED " ++ show spills) $ return ()

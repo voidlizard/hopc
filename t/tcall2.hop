@@ -1,6 +1,6 @@
 
 
-($ ccall "display" :string :unit $)
+($ foreign "display" display ((:string) :unit) $)
 
 (define (qqq a b c) 
     (display a)
