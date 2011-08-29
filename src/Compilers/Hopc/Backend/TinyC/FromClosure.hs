@@ -31,7 +31,9 @@ type LabelM = StateT C1 I.M
 convert :: Closure -> CompileM [Proc]
 convert k = do
     e <- getEntries
-    (return) (runSimpleUniqueMonad $ runWithFuel 0 (procs e k))
+    t <- nextTmp
+
+    return (runSimpleUniqueMonad $ runWithFuel 0 (procs e k))
 
     where
 
@@ -83,20 +85,20 @@ convert k = do
             ln <- newLabel 
             let b' = b <*> mkLast (Call ln (Direct n) args var)
             let b'' = mkFirst (I.Label ln)
-            endblock (b'', g |*><*| b')
+            return (b'', g |*><*| b')
 
         tr var b g (CApplCls n args) = do
             ln <- newLabel 
             let b' = b <*> mkLast (Call ln (Closure n) args var)
             let b'' = mkFirst (I.Label ln)
-            endblock (b'', g |*><*| b')
+            return (b'', g |*><*| b')
 
         tr v b g (CCond n c1 c2) = do
             l1 <- newLabel
             l2 <- newLabel
             l3 <- newLabel
 
-            (b1, g')  <- tr v (mkFirst (I.Label l1)) g  c1
+            (b1, g')  <- tr v (mkFirst (I.Label l1)) g  c1 --- rename v unique --- move v' at exit from conditional v
             (b2, g'') <- tr v (mkFirst (I.Label l2)) g' c2
             
             let b3 = mkFirst (I.Label l3)

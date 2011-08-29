@@ -47,7 +47,7 @@ main = do
     (x:_) <- getArgs
     input x $ \s -> do
         st <- runCompile initCompile $ do
-               k <- parseTop s >>= K.kNormalizeTop  -- >>= dump 
+               k <- parseTop s >>= K.kNormalizeTop   >>= dump 
 --                               >>= A.alphaConvM    >>= dump
 
 
@@ -67,7 +67,7 @@ main = do
                                 >>= B.betaReduceM
                                 >>= L.flattenM
 
-               c1 <- C.conv2 k'' >>= E.eliminate  -- >>= dump -- FIXME: make-closure in tail position
+               c1 <- C.conv2 k'' >>= E.eliminate  >>= dump -- FIXME: make-closure in tail position
 
                liftIO $ putStrLn $ prettyShow c1
 

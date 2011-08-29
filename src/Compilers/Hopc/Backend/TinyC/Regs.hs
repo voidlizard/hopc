@@ -30,15 +30,9 @@ import Compiler.Hoopl
 import Debug.Trace
 import Text.Printf 
 
-data Scan = Scan { s_seenby  :: M.Map Label (S.Set Label)
-                 , s_rets    :: S.Set Label
-                 , s_blocksL :: [(Label, Block Insn C C)]
-                 , s_blockM  :: M.Map Label (Block Insn C C)
-                 , s_graph   :: Graph Insn C C
-                 }
-
 data RegEnv  = RegEnv { label :: Label
-                      , liveFacts :: FactBase Live 
+                      , liveFacts :: FactBase Live
+                      , mayLive :: M.Map Label Live
                       , regAlloc :: M.Map KId R
                       , regFree :: S.Set R
                       , regSpilled :: M.Map KId (R, Slot)
@@ -52,7 +46,7 @@ type RegEnvM = StateT RegEnv I.M
 initRegEnv :: [(KId, R)] -> Label -> FactBase Live -> TDict -> Graph Insn C C -> RegEnv
 initRegEnv pre e lf tdict g = 
     let free = (S.fromList R.avail) `S.difference` S.fromList (map snd pre)
-    in RegEnv e lf (M.fromList pre) free M.empty S.empty 0 tdict g
+    in RegEnv e lf M.empty (M.fromList pre) free M.empty S.empty 0 tdict g
 
 regenvLabel :: Label -> RegEnv -> RegEnv
 regenvLabel l fb = fb{label = l}
@@ -121,6 +115,9 @@ regenvUpdateFact l fn re@(RegEnv{liveFacts = lf}) =
     where withFact _ (Just f) fn = fn f
           withFact re Nothing fn  = re
 
+regenvMayLive :: Label -> Live -> RegEnv -> RegEnv
+regenvMayLive l lf re@(RegEnv{mayLive=m}) = trace ("\nregenvMayLive " ++ show l ++ " " ++ show lf) $ re{ mayLive = M.insert l lf m}
+
 regenvLiveRegs :: Label -> RegEnv -> [(KId, R)]
 regenvLiveRegs l  re@(RegEnv{regAlloc=ra, liveFacts=lf}) =
   let rn = M.keysSet
@@ -135,7 +132,7 @@ allocateAndFlatten dict live p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.a
 
     let (GMany _ bbb _) = g
 
---    execStateT (mapM_ (printBlock (return ()) live) (postorder_dfs_from bbb e)) e
+    execStateT (mapM_ (printBlock (return ()) live) (postorder_dfs_from bbb e)) e
 
     let pre = zip (activationRecordVariable:retvalVariable:as) (R.allRegs :: [R])
 
@@ -178,14 +175,23 @@ allocateAndFlatten dict live p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.a
             transNode (I.Cond n l1 l2) = withRegs [n] $ do
                 mergeFacts l1 l2
                 r <- reg n
-                return $ V.BranchTrue r l1 : V.Branch l2 : []
+--                st <- get
+--                let (GMany _ bbb _) = rgraph st
+--                let qqq = postorder_dfs_from bbb l1
+--                let b1 = 
+--                (ops1, rnv1) <- lift $ runStateT (mapM transBlock (postorder_dfs_from bbb l1)) st
+--                (ops2, rnv2) <- lift $ runStateT (mapM transBlock (postorder_dfs_from bbb l2)) st
+--                let qq = ops1 ++ ops2
+--                return qq
+
+                return $ V.BranchTrue r l1 : V.Branch l2 : [] 
 
             transNode (I.MkClos _ _ _ ) = error "CLOSURES ARE NOT SUPPORTED YET" -- FIXME ASAP!!!
 
             callOf :: forall e x. Insn e x -> HType -> RegEnvM [V.Op]
             callOf (I.Call l (I.Direct n) args r) (TFun TFunLocal _ rt) = do
                 rs <- mapM reg args
-                
+
                 ra <- gets regAlloc
                 lr <- gets (regenvLiveRegs l)
 --                trace ("\n\nSPILL BEFORE CALL " ++ show ra ++ " " ++ show lr) $ return ()
@@ -275,10 +281,17 @@ allocateAndFlatten dict live p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.a
                 sp <- gets regSpilled
                 sn <- gets spill
  
-                let live = maybe S.empty id (lookupFact l lf)
+                mlive <- gets mayLive >>= return . M.lookup l
+                let live  = maybe S.empty id (lookupFact l lf)
                 let dead = M.keysSet ra `S.difference` live
- 
-                modify (regenvFree live)
+
+--                trace ("ENTER BLOCK " ++ show l) $ return ()
+--                trace ("LIVE VARS: " ++ show live) $ return ()
+--                trace ("MAYBE LIVE VARS " ++ show mlive) $ return ()
+
+                let live' = live `S.union` maybe S.empty id mlive
+--                modify (regenvFree live')
+                return ()
 
 --                trace ("\n\nTRACE: ENTER BLOCK " ++ show l) $ return ()
 --                trace ("LIVES " ++ show live) $ return ()
@@ -347,14 +360,32 @@ allocateAndFlatten dict live p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.a
                 let ll = ls2 `S.difference` lsi
                 let lr = ls1 `S.difference` lsi
 
-                fl <- fact l1 
+                la <- mapM fact (S.toList lsi)
+
+                fl <- fact l1
                 fr <- fact l2
+                lv <- fact l
 
-                forM_ (S.toList $ ll) $ \l ->
-                    modify (regenvUpdateFact l (S.union fl))
+                trace ("\nMERGE FACTS: " ++ show l1 ++ " " ++ show l2) $ return ()
+                trace ("LIVE REGS: " ++ show ra) $ return ()
+                trace ("REGS: " ++ show ra') $ return ()
+                trace ("SUCC LSI: " ++ show lsi) $ return ()
+                trace ("SUCC L1: " ++ show ls1) $ return ()
+                trace ("SUCC L2: " ++ show ls2) $ return ()
 
-                forM_ (S.toList $ lr) $ \l ->
-                    modify (regenvUpdateFact l (S.union fr))
+                trace ("LA: " ++ show  (la)) $ return ()
+                trace ("FL: " ++ show  (fl `S.intersection` lv)) $ return ()
+                trace ("FR: " ++ show  (fr `S.intersection` lv)) $ return ()
+                trace ("") $ return ()
+
+--                trace ("SUCC L2: " ++ show sucL) $ return ()
+--                trace ("SUCC L1: " ++ show sucR) $ return ()
+
+--                forM_ (S.toList $ ll) $ \lx ->
+--                    modify (regenvMayLive lx fl)
+
+--                forM_ (S.toList $ lr) $ \lx ->
+--                    modify (regenvMayLive lx fr)
 
 --                forM_ (S.toList $ ll `S.union` lr) $ \l ->
 --                    modify (regenvUpdateFact l (S.union fact))
@@ -398,6 +429,7 @@ allocateAndFlatten dict live p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.a
                     flat' = withBlocks bmap nr ++ concatMap revert r
                     br = S.fromList $ foldl bra [] flat' 
                     flat = rmBranches $ filter (skipLabels br) flat'
+--                    flat = flat' 
 
                 in flat 
               where wl ((V.Label l):xs) = Just (l, xs)
@@ -463,6 +495,5 @@ callvar (I.Direct n) = n
 
 --withMaybeM :: (Monad m) => Maybe a -> b -> (a -> m b) -> m b
 --withMaybeM (Just 
-
 
 
