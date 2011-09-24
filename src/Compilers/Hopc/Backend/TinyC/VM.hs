@@ -12,6 +12,7 @@ import qualified Data.Set as S
 import Data.Maybe
 import Control.Monad.State
 import Control.Monad.Reader
+import Control.Monad.Writer
 import Control.Monad.Trans
 import Compiler.Hoopl
 
@@ -21,24 +22,26 @@ import Text.Printf
 import Compilers.Hopc.Compile
 import Compilers.Hopc.Id
 import Compilers.Hopc.Frontend.Types
+import Compilers.Hopc.Backend.TinyC.Live
 import Compilers.Hopc.Backend.TinyC.IR (Insn)
 import Compilers.Hopc.Backend.TinyC.VM.Types
 --import Compilers.Hopc.Backend.TinyC.Regs
 import qualified Compilers.Hopc.Backend.TinyC.IR as I
 
-fromIR :: TDict -> RegAllocation -> I.Proc -> I.M Proc
+fromIR :: TDict -> FactBase Live -> RegAllocation -> I.Proc -> I.M Proc
 
-fromIR dict ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}) = do
+fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}) = do
   let (GMany _ bbb _) = g
   let blocks = postorder_dfs_from bbb e
 
 --  mapM_ printBlock blocks
 --  trace "---" $ return ()
 
-  vm <- flip runReaderT (initR ra dict) $ flip evalStateT (REnvSt e M.empty M.empty [] 0) $ do
-          liftM mergeBlocks $ mapM (\b -> foldBlockNodesF (liftVM trNode) b emptyM) blocks
+  (vm, st) <- flip runReaderT initR $ flip runStateT initS $
+--          liftM (mergeBlocks e) $
+                liftM concat $ mapM (\b -> foldBlockNodesF (liftVM trNode) b emptyM) blocks
 
-  return $ Proc {name = n, arity = length as, slotnum = 0, body = vm}
+  return $ Proc {name = n, arity = length as, slotnum = (rsSlotMax st), body = vm}
 
   where
 
@@ -84,9 +87,14 @@ fromIR dict ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}) = d
     callOf :: forall e x. Insn e x -> HType -> TrM TOp
  
     callOf (I.Call l (I.Direct n) args r) (TFun TFunLocal _ rt) = do
+      (spl, s) <- spillAlive l r
+--      trace "SPILL ALIVE" $ trace (show spl) $ return () 
       uns <- mapM (\x -> unspill x Nothing) args >>= return . concat
       rs <- mapM reg args
-      callRet rt r (chunkMs . CallL l n rs) >>= \x -> chunkM $ uns ++ x
+      call <- callRet rt r (chunkMs . CallL l n rs) >>= \x -> chunkM $ spl ++ uns ++ x
+      unsp <- mapM (\(n,r) -> unspill n (Just r)) s >>= return . concat
+      mapM_ delSpill (map fst s)
+      chunkM $ call ++ unsp
 
     callOf (I.Call l (I.Direct n) args r) (TFun (TFunForeign nm) _ rt) = do
       uns <- mapM (\x -> unspill x Nothing) args >>= return . concat
@@ -104,28 +112,55 @@ fromIR dict ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}) = d
       (RegAllocation{spill=sp}) <- asks regalloc
       case M.lookup n sp of
         Nothing -> emptyM
-        Just spills -> keepSpills spills >> mapM spillOf (S.toList spills)
+        Just spills -> mapM spillOf (S.toList spills) >>= return.concat
 
-    keepSpills :: S.Set (KId, R, Int) -> TrM ()
-    keepSpills ns = do
-      st@(REnvSt{rsSpill=sp}) <- get
-      let newSp = M.fromList $ map (\(n,r,s) -> (n,s)) (S.toList ns)
-      put st { rsSpill = sp `M.union` newSp }
-
-    spillOf  :: (KId, R, Int) -> TrM Op 
+    spillOf  :: (KId, R, Int) -> TrM TOp
     spillOf (n,r,s) = do
+--      trace ("SPILL VAR " ++ show (n,r)) $ return ()
       i <- gets rsSlot
-      let sp = Spill r i
-      modify(\s -> s{rsSlot=(i+1), rsFree=r:rsFree s})
-      return sp
+      spilled <- gets (M.member n . rsSpill)
+      if spilled 
+        then emptyM
+        else do let sp = Spill r i
+                succSlot
+                modify(\s -> s{rsFree=r:rsFree s, rsSpill = M.insert n i (rsSpill s)})
+                chunkMs sp
+
 
     spillReg :: TrM TOp
     spillReg = do
       st@(REnvSt{rsSpill=sp, rsAlloc=ra, rsSlot=n}) <- get
       let alloc = ra `M.difference` sp
       let (n,r) = head $ M.toList alloc -- FIXME
-      q <- spillOf (n,r,0)
-      chunkMs q
+      spillOf (n,r,0)
+    
+    spillAlive :: Label -> KId -> TrM (TOp, [(KId, R)])
+    spillAlive l n = do
+      ra <- gets rsAlloc
+      rs <- gets rsSpill
+      rl <- asks rlive
+      let lv = maybe [] (S.toList) (lookupFact l rl)
+      let skip = M.singleton n Nothing
+      let ls' = (ra `M.intersection` M.fromList (zip lv (repeat Nothing))) `M.difference` rs
+      let ls  = ls' `M.difference` skip
+      runWriterT $ liftM concat $
+        mapM (\(n,r) -> tell [(n,r)] >> (lift $ spillOf (n,r,0))) $ M.toList ls
+
+    spillFrom :: Op -> Maybe (R, Int)
+    spillFrom (Spill r n) = Just (r, n)
+    spillFrom _ = Nothing
+
+    delSpill :: KId -> TrM ()
+    delSpill n = modify (\s -> s { rsSlot = rsSlot s - 1, rsSpill = M.delete n (rsSpill s)})
+
+--    killSpill :: Int -> R -> TrM TOp
+--    killSpill n r = do
+--      modify (\s -> s{rsSpill = M.delete n }
+--      chunkM [Unspill n r]
+--      sp <- gets rsSpill >>= return . M.lookup n
+--      case sp of
+--        Nothing -> emptyM
+--        Just s  -> chunkM [Unspill   r]
 
     unspill :: KId -> Maybe R -> TrM TOp
     unspill n (Just r) = do
@@ -142,7 +177,7 @@ fromIR dict ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}) = d
     unspill' (Just s) n = do
       rf <- gets rsFree
       l <- gets rsLabel
-      trace ("UNSPILL " ++ show l) $ trace (show n) $ trace (show rf) $ return ()
+--      trace ("UNSPILL " ++ show l) $ trace (show n) $ trace (show rf) $ return ()
       mt <- gets (null.rsFree)
       sp <- if mt then spillReg else emptyM
       rfree <- gets rsFree
@@ -153,6 +188,12 @@ fromIR dict ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}) = d
       chunkM $ sp ++ [Unspill s r]
 
     unspill' Nothing _ = emptyM
+
+    succSlot :: TrM ()
+    succSlot = do
+      slot <- gets rsSlot >>= return . succ
+      slotMx <- gets rsSlotMax
+      modify (\s -> s{rsSlot=slot, rsSlotMax=max slot slotMx})
 
     tmpReg :: KId -> R -> TrM ()
     tmpReg n r = modify (\s -> s{rsAlloc = M.insert n r (rsAlloc s)})
@@ -197,11 +238,14 @@ fromIR dict ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}) = d
     callvar (I.Closure n) = n
     callvar (I.Direct n) = n
 
-    initR :: RegAllocation -> TDict -> REnv
-    initR ra d = REnv ra d
+    initR :: REnv
+    initR = REnv ra dict live
 
-    mergeBlocks :: [[Op]] -> [Op]
-    mergeBlocks bs =
+    initS :: REnvSt
+    initS = REnvSt e M.empty M.empty [] 0 0
+
+    mergeBlocks :: Label -> [[Op]] -> [Op]
+    mergeBlocks e bs =
         let blk = catMaybes $ map wl bs
             (r, nr) = partition ret blk
             bro = sort $ foldl bra [] $ concatMap snd nr
@@ -212,7 +256,7 @@ fromIR dict ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}) = d
             flat = rmBranches $ filter (skipLabels br) flat'
 --                    flat = flat' 
 
-        in flat 
+        in Label e : flat
       where wl ((Label l):xs) = Just (l, xs)
             wl _                = Nothing
             ret (l,[]) = False
@@ -279,13 +323,17 @@ fromIR dict ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}) = d
 --    printN x = do
 --        trace (printf "%-60s ;" (show x)) $ return ()
 
-data REnv = REnv { regalloc :: RegAllocation, rdict :: TDict }
+data REnv = REnv { regalloc :: RegAllocation
+                 , rdict :: TDict
+                 , rlive :: FactBase Live 
+                 }
 
 data REnvSt  = REnvSt { rsLabel :: Label
                       , rsAlloc :: M.Map KId R
                       , rsSpill :: M.Map KId Int
                       , rsFree  :: [R]
                       , rsSlot  :: Int
+                      , rsSlotMax :: Int
                       }
 
 type TrM = StateT REnvSt (ReaderT REnv I.M)

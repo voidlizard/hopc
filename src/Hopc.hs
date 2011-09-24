@@ -82,7 +82,7 @@ main = do
                    x <- return $ runM $ do
                                    live <- L.live e g
                                    alloc <- R.allocateLinearScan dict live p
-                                   fromIR dict alloc p
+                                   fromIR dict live alloc p
 
                    let (Proc{V.name=n, arity=ar, slotnum=sn, V.body=ops}) = x
                    liftIO $ putStrLn $ printf "FUNCTION: %s(%d) slotnum: %d" n ar sn
