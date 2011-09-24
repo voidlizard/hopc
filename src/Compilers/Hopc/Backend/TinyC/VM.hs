@@ -38,8 +38,8 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
 --  trace "---" $ return ()
 
   (vm, st) <- flip runReaderT initR $ flip runStateT initS $
---          liftM (mergeBlocks e) $
-                liftM concat $ mapM (\b -> foldBlockNodesF (liftVM trNode) b emptyM) blocks
+          liftM (mergeBlocks e) $
+            mapM (\b -> foldBlockNodesF (liftVM trNode) b emptyM) blocks
 
   return $ Proc {name = n, arity = length as, slotnum = (rsSlotMax st), body = vm}
 
