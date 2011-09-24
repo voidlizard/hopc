@@ -146,21 +146,8 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
       runWriterT $ liftM concat $
         mapM (\(n,r) -> tell [(n,r)] >> (lift $ spillOf (n,r,0))) $ M.toList ls
 
-    spillFrom :: Op -> Maybe (R, Int)
-    spillFrom (Spill r n) = Just (r, n)
-    spillFrom _ = Nothing
-
     delSpill :: KId -> TrM ()
     delSpill n = modify (\s -> s { rsSlot = rsSlot s - 1, rsSpill = M.delete n (rsSpill s)})
-
---    killSpill :: Int -> R -> TrM TOp
---    killSpill n r = do
---      modify (\s -> s{rsSpill = M.delete n }
---      chunkM [Unspill n r]
---      sp <- gets rsSpill >>= return . M.lookup n
---      case sp of
---        Nothing -> emptyM
---        Just s  -> chunkM [Unspill   r]
 
     unspill :: KId -> Maybe R -> TrM TOp
     unspill n (Just r) = do
