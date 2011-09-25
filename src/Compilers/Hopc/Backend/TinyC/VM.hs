@@ -39,7 +39,7 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
 --  trace "---" $ return ()
 
   (vm, st) <- flip runReaderT initR $ flip runStateT initS $
-          liftM (mergeBlocks e) $
+          liftM (wipeSnots . mergeBlocks e) $
             mapM (\b -> foldBlockNodesF (liftVM trNode) b emptyM) blocks
 
   return $ Proc {name = n, arity = length as, slotnum = (rsSlotMax st), body = vm}
@@ -72,7 +72,7 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
       r <- reg n
       chunkM $ u ++ [BranchTrue r l1, Branch l2]
 
-    trNode (I.Return n) = do
+    trNode (I.Return n) | notVoid = do
       ur  <- unspill n (Just R1)
       unsp <- unspill activationRecordVariable (Just closureReg)
       rv <- reg n
@@ -81,9 +81,19 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
                 x   -> ur ++ unsp ++ [Return]
       chunkM ret
 
+    trNode (I.Return n) = do
+      unsp <- unspill activationRecordVariable (Just closureReg)
+      chunkM $ unsp ++ [Return] 
+
     trNode (I.MkClos _ _ _) = error "CLOSURES ARE NOT SUPPORTED YET" -- FIXME
 
     trNode _ = chunkM [Nop]
+
+    notVoid :: Bool
+    notVoid = notVoid' (varType n dict)
+
+    notVoid' (TFun _ _ TUnit) = False
+    notVoid' _ = True
 
     callOf :: forall e x. Insn e x -> HType -> TrM TOp
  
@@ -221,6 +231,11 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
 
     initS :: REnvSt
     initS = REnvSt e M.empty M.empty [] 0 0
+
+    wipeSnots :: [Op] -> [Op]
+    wipeSnots x = filter voidOp x
+      where voidOp (Move r1 r2) | r1 == r2 = False
+            voidOp _ = True
 
     mergeBlocks :: Label -> [[Op]] -> [Op]
     mergeBlocks e bs =

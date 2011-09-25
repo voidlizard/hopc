@@ -209,12 +209,16 @@ allocateLinearScan dict live asap p@(I.Proc {I.entry = e, I.body = g, I.name = n
       useOf _ x = x
 
       factIns' :: KId -> Label -> M.Map KId Label -> M.Map KId Label
-      factIns' n l v = if M.member n v then v else M.insert n l v
+      factIns' n l v = if isUnit n || M.member n v then v else M.insert n l v
 
       factIns v l =
         let fs' = maybe [] (S.toList) (lookupFact l live)
-            fs  = zip (filter (not.(flip M.member v)) fs') (repeat l)
+            fs  = zip (filter (not.isUnit) (filter (not.(flip M.member v)) fs')) (repeat l)
         in v `M.union` M.fromList fs
+
+      isUnit :: KId -> Bool
+      isUnit n = maybe False (== TUnit) $ M.lookup n dict
+--      isUnit n = False 
 
 data RegAllocSt = RegAllocSt { lcmp :: Label -> Label -> Ordering
                              , actives :: [Interval]
