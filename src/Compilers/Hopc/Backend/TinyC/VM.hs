@@ -105,7 +105,9 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
       call <- callRet rt r (chunkMs . CallL l n rs) >>= \x -> chunkM $ spl ++ uns ++ x
       unsp <- mapM (\(n,r) -> unspill n (Just r)) s >>= return . concat
       mapM_ delSpill (map fst s)
-      chunkM $ call ++ unsp
+      retR <- reg r
+--      trace "CALL OF" $ trace (show n) $ trace (show rt) $ return ()
+      chunkM $ call ++ movRet rt retR ++ unsp
 
     callOf (I.Call l (I.Direct n) args r) (TFun (TFunForeign nm) _ rt) = do
       uns <- mapM (\x -> unspill x Nothing) args >>= return . concat
@@ -113,6 +115,10 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
       callRet rt r (chunkMs . CallF l nm rs) >>= \x -> chunkM $ uns ++ x
 
     callOf _ _ = error "Unsupported call type" -- FIXME ASAP
+
+    movRet :: HType -> R -> [Op]
+    movRet TUnit r = []
+    movRet _ r = [Move R1 r]
 
     callRet :: HType -> KId -> (RT -> TrM TOp) -> TrM TOp
     callRet TUnit v f = f RVoid
@@ -199,10 +205,11 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
     label l = do
       ra  <- asks (alloc.regalloc) >>= return . M.lookup l
       rf  <- asks (free.regalloc) >>= return . M.lookup l
+      free' <- gets rsFree
       ma' <- gets rsAlloc
       let ma = maybe M.empty id ra
 --      trace ("LABEL " ++ show l) $ trace ("FREE REGS ") $ trace (show rf) $ trace "<<<" $
-      modify (\st -> st {rsLabel = l, rsAlloc = ma' `M.union` ma, rsFree = (maybe [] id rf)})
+      modify (\st -> st {rsLabel = l, rsAlloc = ma' `M.union` ma, rsFree = (maybe free' id rf)})
 
     reg :: KId -> TrM R
     reg n = do
@@ -314,11 +321,6 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
 --    printN x = do
 --        trace (printf "%-60s ;" (show x)) $ return ()
 
---spillASAP :: TDict -> FactBase Live -> I.Proc -> RegAllocation -> S.Set KId
---spillASAP dict live p (RegAllocation{spill=sp}) = graph -- `S.intersection` alloc
---  where all = foldl S.union S.empty $ M.elems sp
---        alloc = S.map (\(a, _, _) -> a) all
---        graph = spillASAP' dict live p
 
 spillASAP :: TDict -> FactBase Live -> I.Proc -> S.Set KId 
 spillASAP dict live (I.Proc{I.body=g, I.args=as}) = ofProc $ foldGraphNodes node g S.empty

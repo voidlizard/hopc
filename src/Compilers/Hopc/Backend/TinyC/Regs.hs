@@ -61,6 +61,7 @@ allocateLinearScan dict live asap p@(I.Proc {I.entry = e, I.body = g, I.name = n
       flip execStateT (initRegAlloc labelCmp) $ do
         forM_ intervals $ \i -> do
             expireOldIntervals i
+            trackFree i
             an <- activeN
             if an >= regsN
               then spillAtInterval i
@@ -74,7 +75,8 @@ allocateLinearScan dict live asap p@(I.Proc {I.entry = e, I.body = g, I.name = n
 --    trace "\n-- REGISTER ALLOCATION --" $
 --      trace (intercalate "\n" $ map show $ M.toList t) $
 --        trace (intercalate "\n" $ map show $ M.toList s) $
---          return ()
+--          trace (intercalate "\n" $ map show $ M.toList f) $
+--            return ()
 
     return $ RegAllocation t s f nl 
 
@@ -117,6 +119,11 @@ allocateLinearScan dict live asap p@(I.Proc {I.entry = e, I.body = g, I.name = n
 --        trace ("REG. ALLOC " ++ (show (fst i)) ++ " " ++ show r) $ return ()
 
       updateReg _ Nothing = return ()
+
+      trackFree :: Interval -> StateT RegAllocSt I.M ()
+      trackFree (_, (l1, _)) = do
+        r <- gets regPool
+        modify (\s -> s {freeTrack = M.insert l1 r (freeTrack s)})
 
       trackReg :: Interval -> R -> StateT RegAllocSt I.M ()
       trackReg (n, (l1, _)) r = do
@@ -217,8 +224,8 @@ allocateLinearScan dict live asap p@(I.Proc {I.entry = e, I.body = g, I.name = n
         in v `M.union` M.fromList fs
 
       isUnit :: KId -> Bool
-      isUnit n = maybe False (== TUnit) $ M.lookup n dict
---      isUnit n = False 
+--      isUnit n = maybe False (== TUnit) $ M.lookup n dict
+      isUnit n = False 
 
 data RegAllocSt = RegAllocSt { lcmp :: Label -> Label -> Ordering
                              , actives :: [Interval]
