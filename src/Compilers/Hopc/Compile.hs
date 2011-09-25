@@ -14,6 +14,8 @@ import Control.Monad.State
 import Control.Monad.Error
 import Control.Exception
 
+import Compiler.Hoopl
+
 data Entry = Entry { eType :: HType, eTop :: Bool } deriving (Show)
 
 type Dict = M.Map KId Entry 
@@ -23,14 +25,22 @@ type TDict = M.Map KId HType
 data CompileState = CompileState { cdict :: Dict, centry :: Maybe KId, ctmpid :: Int }
                     deriving (Show)
 
-newtype CompileM a = CompileM {
-    runT :: (StateT CompileState (ErrorT CompileError IO)) a
-} deriving (Monad, MonadIO, MonadError CompileError, MonadState CompileState)
+newtype CompileT m a = CompileT {
+    runT :: (StateT CompileState (ErrorT CompileError m)) a
+} deriving (Monad, MonadError CompileError, MonadState CompileState)
+
+
+instance MonadTrans CompileT where
+  lift = CompileT . lift . lift
+
+type M = CheckingFuelMonad (SimpleUniqueMonad) 
+
+type CompileM = CompileT M
 
 --runCompile :: CompileState -> CompileM () -> CompileM (IO (Either CompileError, a))
-runCompile :: CompileState
-              -> CompileM a
-              -> IO (Either CompileError (a, CompileState))
+--runCompile :: CompileState
+--              -> CompileM a
+--              -> IO (Either CompileError (a, CompileState))
 
 runCompile init f = runErrorT (runStateT (runT f) init)
 

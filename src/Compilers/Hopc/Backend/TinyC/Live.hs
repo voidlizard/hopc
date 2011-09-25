@@ -33,8 +33,8 @@ liveness = mkBTransfer live
     live (Const _ n)      f = addUses f [n]
     live (Branch l)       f = fact f l
     live (Cond n tl fl)   f = addUses (fact f tl `S.union` fact f fl) [n]
-    live (Call l (Closure n) an rn) f = addUses (fact f l) (n:an)   -- addUses (fact f l `S.un` (n:an)  -- addUses (S.delete rn $ fact f l) (n:an)
-    live (Call l (Direct n) an rn) f  = addUses (fact f l) an -- addUses (S.delete rn $ fact f l) an
+    live (Call l (Closure n _) an rn) f = addUses (fact f l) (n:an)   -- addUses (fact f l `S.un` (n:an)  -- addUses (S.delete rn $ fact f l) (n:an)
+    live (Call l (Direct n _) an rn) f  = addUses (fact f l) an -- addUses (S.delete rn $ fact f l) an
     live (MkClos n an rn) f = addUses f (n:an)
     live (Return n)       _ = addUses (fact_bot liveLattice) [n,activationRecordVariable]
 

@@ -29,7 +29,7 @@ import Compilers.Hopc.Backend.TinyC.VM.Types
 --import Compilers.Hopc.Backend.TinyC.Regs
 import qualified Compilers.Hopc.Backend.TinyC.IR as I
 
-fromIR :: TDict -> FactBase Live -> RegAllocation -> I.Proc -> I.M Proc
+fromIR :: TDict -> FactBase Live -> RegAllocation -> I.Proc -> M Proc
 
 fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}) = do
   let (GMany _ bbb _) = g
@@ -53,7 +53,14 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
       spill <- spillAtBlock n
       chunkM $ Label n : spill
 
-    trNode x@(I.Call _ ct _ _) = return (varType (callvar ct) dict) >>= callOf x
+    trNode x@(I.Call l ct _ _) = do
+      let callT = varType (callvar ct) dict
+      let isTail = analyzeTailCall l ct callT
+      return callT >>= callOf (makeTail isTail x)
+--      trace ("ANALYZE TAIL CALL " ++ n) $
+--        trace (show x ++ " " ++ show isTail) $
+--          return ()
+--      trace "SUCCESSORS " $ trace (show isTail) $ return ()
  
     trNode (I.Const c n) = do
       r <- reg n
@@ -95,28 +102,61 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
     notVoid' (TFun _ _ TUnit) = False
     notVoid' _ = True
 
+    reloadArg :: (R, KId) -> TrM TOp
+    reloadArg (r, n) = do
+      spills <- gets rsSpill
+      if M.member n spills
+        then unspill n (Just r)
+        else reg n >>= chunkMs . flip Move r
+
+    newLabel :: TrM Label
+    newLabel = lift $ lift $ freshLabel
+
     callOf :: forall e x. Insn e x -> HType -> TrM TOp
- 
-    callOf (I.Call l (I.Direct n) args r) (TFun TFunLocal _ rt) = do
+
+    -- got tail call
+    callOf call@(I.Call l (I.Direct n True) args r) t@(TFun TFunLocal _ rt) = do
+      alc <- asks (fromJust.M.lookup e.alloc.regalloc)
+      spills <- gets rsSpill
+      curr <- gets rsAlloc
+      r0 <- unspill activationRecordVariable (Just R0)
+      let regs = map (\n -> fromJust $ M.lookup n alc) as
+      areload <- mapM reloadArg (zip regs args) >>= return . concat
+      modify(\s -> s{rsMerge=skipOps})
+      chunkM $ r0 ++ areload ++ [Branch e]
+
+    callOf call@(I.Call l (I.Direct n False) args r) (TFun TFunLocal _ rt) = do
       (spl, s) <- spillAlive l r
 --      trace "SPILL ALIVE" $ trace (show spl) $ return () 
       uns <- mapM (\x -> unspill x Nothing) args >>= return . concat
       rs <- mapM reg args
-      call <- callRet rt r (chunkMs . CallL l n rs) >>= \x -> chunkM $ spl ++ uns ++ x
+      lbl <- newLabel
+      call <- callRet rt r (chunkMs . CallL lbl n rs) >>= \x -> chunkM $ spl ++ uns ++ x
       unsp <- mapM (\(n,r) -> unspill n (Just r)) s >>= return . concat
       mapM_ delSpill (map fst s)
-      chunkM $ call ++ unsp
+      retR <- reg r
+--      trace "CALL OF" $ trace (show n) $ trace (show rt) $ return ()
+      chunkM $ call ++ [Label lbl] ++ movRet rt retR ++ unsp ++ [Branch l]
+--      chunkM $ call ++ chunk -- ++ movRet rt retR ++ unsp
 
-    callOf (I.Call l (I.Direct n) args r) (TFun (TFunForeign nm) _ rt) = do
+    callOf (I.Call l (I.Direct n _) args r) (TFun (TFunForeign nm) _ rt) = do
       uns <- mapM (\x -> unspill x Nothing) args >>= return . concat
       rs <- mapM reg args
       callRet rt r (chunkMs . CallF l nm rs) >>= \x -> chunkM $ uns ++ x
 
     callOf _ _ = error "Unsupported call type" -- FIXME ASAP
+      
+    movRet :: HType -> R -> [Op]
+    movRet TUnit r = []
+    movRet _ r = [Move R1 r]
 
     callRet :: HType -> KId -> (RT -> TrM TOp) -> TrM TOp
     callRet TUnit v f = f RVoid
     callRet _     v f = reg v >>= f . RReg
+
+    makeTail :: Bool -> forall e x . Insn e x -> Insn e x 
+    makeTail True (I.Call l (I.Direct n False) as r) = I.Call l (I.Direct n True) as r
+    makeTail _ x = x
 
     spillAtBlock :: Label -> TrM TOp
     spillAtBlock n = do
@@ -199,10 +239,14 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
     label l = do
       ra  <- asks (alloc.regalloc) >>= return . M.lookup l
       rf  <- asks (free.regalloc) >>= return . M.lookup l
+      free' <- gets rsFree
       ma' <- gets rsAlloc
       let ma = maybe M.empty id ra
 --      trace ("LABEL " ++ show l) $ trace ("FREE REGS ") $ trace (show rf) $ trace "<<<" $
-      modify (\st -> st {rsLabel = l, rsAlloc = ma' `M.union` ma, rsFree = (maybe [] id rf)})
+      modify (\st -> st { rsMerge = mergeOp
+                        , rsLabel = l
+                        , rsAlloc = ma' `M.union` ma
+                        , rsFree = (maybe free' id rf)})
 
     reg :: KId -> TrM R
     reg n = do
@@ -215,7 +259,9 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
         Nothing -> error $ "INTERNAL COMPILER ERROR / NO REG ALLOCATED " ++ " " ++ (show n) -- FIXME
 
     liftVM :: forall e x. (Insn e x -> TrM TOp) -> Insn e x -> TrM TOp -> TrM TOp
-    liftVM f n z = liftM2 (++) z (f n)
+    liftVM f n z = do
+      merge <- gets rsMerge
+      liftM2 merge z (f n)
 
     chunkM :: [Op] -> TrM TOp
     chunkM x = return x
@@ -230,7 +276,13 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
     initR = REnv ra dict live
 
     initS :: REnvSt
-    initS = REnvSt e M.empty M.empty [] 0 0
+    initS = REnvSt e M.empty M.empty [] 0 0 mergeOp
+
+    mergeOp :: TOp -> TOp -> TOp
+    mergeOp x y = x ++ y
+
+    skipOps :: TOp -> TOp -> TOp
+    skipOps x y = x
 
     wipeSnots :: [Op] -> [Op]
     wipeSnots x = filter voidOp x
@@ -242,12 +294,12 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
         let blk = catMaybes $ map wl bs
             (r, nr) = partition ret blk
             bro = sort $ foldl bra [] $ concatMap snd nr
-            brefs = S.fromList [head i | i <- group bro, length i > 1]
+            brefs = S.fromList $ e : [head i | i <- group bro, length i > 1]
             bmap  = M.fromList $ map (blockOf brefs) nr
             flat' = withBlocks bmap nr ++ concatMap revert r
-            br = S.fromList $ foldl bra [] flat' 
+            br = (S.fromList $ foldl bra [] flat') `S.union` S.singleton e
             flat = rmBranches $ filter (skipLabels br) flat'
-        in Label e : flat
+        in flat
       where wl ((Label l):xs) = Just (l, xs)
             wl _                = Nothing
             ret (l,[]) = False
@@ -303,7 +355,19 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
             withMaybe (Just a) d f = f a
             withMaybe Nothing d f = d
 
-
+    analyzeTailCall :: Label -> I.CallT -> HType -> Bool
+--    analyzeTailCall l (I.Direct fn _) (TFun TFunLocal _ _) | n == fn =
+--      let (GMany _ b _ ) = g
+--      in foldl (\a b -> foldBlockNodesF node b a) True (postorder_dfs_from b l)
+--      where
+--        node :: forall e x . Insn e x -> Bool -> Bool
+--        node (I.Label _)  a = a && True
+--        node (I.Branch _) a = a && True
+--        node (I.Assign v _) a | v == retvalVariable = a && True
+--        node (I.Return _) a = a && True
+--        node _ a = a && False
+    
+    analyzeTailCall _ _ _ = False
 
     -- debug
 --    printBlock b = foldBlockNodesF (printNode) b (return ())
@@ -313,12 +377,6 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
 --    printN :: forall e x . Insn e x -> I.M ()
 --    printN x = do
 --        trace (printf "%-60s ;" (show x)) $ return ()
-
---spillASAP :: TDict -> FactBase Live -> I.Proc -> RegAllocation -> S.Set KId
---spillASAP dict live p (RegAllocation{spill=sp}) = graph -- `S.intersection` alloc
---  where all = foldl S.union S.empty $ M.elems sp
---        alloc = S.map (\(a, _, _) -> a) all
---        graph = spillASAP' dict live p
 
 spillASAP :: TDict -> FactBase Live -> I.Proc -> S.Set KId 
 spillASAP dict live (I.Proc{I.body=g, I.args=as}) = ofProc $ foldGraphNodes node g S.empty
@@ -344,8 +402,8 @@ varType n rdict =
      else fromJust tp
 
 callvar :: I.CallT -> KId
-callvar (I.Closure n) = n
-callvar (I.Direct n) = n
+callvar (I.Closure n _) = n
+callvar (I.Direct n _)  = n
 
 data REnv = REnv { regalloc :: RegAllocation
                  , rdict :: TDict
@@ -358,9 +416,10 @@ data REnvSt  = REnvSt { rsLabel :: Label
                       , rsFree  :: [R]
                       , rsSlot  :: Int
                       , rsSlotMax :: Int
+                      , rsMerge :: TOp -> TOp -> TOp
                       }
 
-type TrM = StateT REnvSt (ReaderT REnv I.M)
+type TrM = StateT REnvSt (ReaderT REnv M)
 type TOp = [Op]
 
 data C3 = C3 { blocks :: M.Map Label (Either [Op] [Op]) }

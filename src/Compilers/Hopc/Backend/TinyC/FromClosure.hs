@@ -26,23 +26,22 @@ import Debug.Trace
 import Compiler.Hoopl
 
 data C1 = C1 { tdict :: TDict }
-type LabelM = StateT C1 I.M
+type LabelM = StateT C1 M
 
 convert :: Closure -> CompileM [Proc]
 convert k = do
     e <- getEntries
     t <- nextTmp
-
-    return (runSimpleUniqueMonad $ runWithFuel 0 (procs e k))
+    lift $ procs e k
 
     where
 
-        procs :: TDict -> Closure -> I.M [I.Proc]
+        procs :: TDict -> Closure -> M [I.Proc]
         procs e k = do
             let fns = [b | b@(CFun (Fun fn _ _ _)) <- universe k]
             mapM (proc e) fns
 
-        proc :: TDict -> Closure -> I.M I.Proc 
+        proc :: TDict -> Closure -> M I.Proc 
         proc e (CFun (Fun n a f b)) = flip evalStateT (C1 e) $ do
             let retval = retvalVariable 
             entry  <- newLabel
@@ -83,13 +82,13 @@ convert k = do
 
         tr var b g (CApplDir n args) = do
             ln <- newLabel 
-            let b' = b <*> mkLast (Call ln (Direct n) args var)
+            let b' = b <*> mkLast (Call ln (Direct n False) args var)
             let b'' = mkFirst (I.Label ln)
             return (b'', g |*><*| b')
 
         tr var b g (CApplCls n args) = do
             ln <- newLabel 
-            let b' = b <*> mkLast (Call ln (Closure n) args var)
+            let b' = b <*> mkLast (Call ln (Closure n False) args var)
             let b'' = mkFirst (I.Label ln)
             return (b'', g |*><*| b')
 

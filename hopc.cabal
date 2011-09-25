@@ -43,3 +43,19 @@ executable test-typing
     hs-source-dirs:	     src
     ghc-options:         -O2 -Wall
 
+executable TestC1 
+    main-is:             TestC1.hs
+
+    build-depends:       base >= 4.0
+                        ,bytestring
+                        ,containers
+                        ,prettyclass
+                        ,array
+                        ,mtl
+                        ,uniplate
+                        ,vector
+                        ,hoopl
+
+    hs-source-dirs:	     src
+    ghc-options:         -O2 -Wall
+
