@@ -1,16 +1,19 @@
 
-($ ccall "display" :string :unit $)
-($ ccall "sleep"   :int :unit $)
+($ foreign "display" display ((:string) :unit) $)
+($ foreign "newline" newline ((:unit) :int)   $)
+($ foreign "sleep"   sleep   ((:int) :)       $)
 
 (define (pysh s) (display s))
 
+($ typeof main ((:unit) :unit) $)
+
 (define (main)
     (display "PREVED")
-    (pysh)
-    (sleep 1)
-    (pysh)
-    (let (q pysh) (q "MEDVED"))
-    (pysh)
+    (newline)
+    (pysh "PYSH")
+    (sleep 13)
+    (main)
+    (pysh "PYSH II")
 )
 
 (main)

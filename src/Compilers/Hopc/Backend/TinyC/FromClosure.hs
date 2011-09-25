@@ -83,13 +83,13 @@ convert k = do
 
         tr var b g (CApplDir n args) = do
             ln <- newLabel 
-            let b' = b <*> mkLast (Call ln (Direct n) args var)
+            let b' = b <*> mkLast (Call ln (Direct n False) args var)
             let b'' = mkFirst (I.Label ln)
             return (b'', g |*><*| b')
 
         tr var b g (CApplCls n args) = do
             ln <- newLabel 
-            let b' = b <*> mkLast (Call ln (Closure n) args var)
+            let b' = b <*> mkLast (Call ln (Closure n False) args var)
             let b'' = mkFirst (I.Label ln)
             return (b'', g |*><*| b')
 

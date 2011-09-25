@@ -37,7 +37,8 @@ import Text.Printf
 allocateLinearScan :: TDict -> FactBase Live -> S.Set KId -> I.Proc -> I.M RegAllocation
 allocateLinearScan dict live asap p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}) = do
     let (GMany _ bbb _) = g
-    let prep = M.fromList $ zip (activationRecordVariable:as) (repeat e)
+    let args = activationRecordVariable:as
+    let prep = M.fromList $ zip args (repeat e)
     let asap = M.keysSet prep 
     let blocks = postorder_dfs_from bbb e
     let labels  = concatMap (\b -> foldBlockNodesF labelOf b []) blocks
@@ -49,6 +50,7 @@ allocateLinearScan dict live asap p@(I.Proc {I.entry = e, I.body = g, I.name = n
 --    trace "WTF:" $ trace (show wtf) $ return () 
     let intervals' = M.intersectionWith (\a b -> (a, b)) starts (ends `M.union` rest)
     let intervals  = sortBy (intervalCmpS labelCmp) $ M.toList intervals'
+    let preintervals = catMaybes $ map (\n -> maybe Nothing (Just . ((,) n)) (lookup n intervals)) args
 
 --    trace "\n-- INTERVALS --" $ trace (show starts)  $ trace (show ends) $ return ()
 
@@ -59,6 +61,7 @@ allocateLinearScan dict live asap p@(I.Proc {I.entry = e, I.body = g, I.name = n
                , spillTrack=s
                , freeTrack=f}) <- do
       flip execStateT (initRegAlloc labelCmp) $ do
+        preallocate (zip preintervals R.allRegs)
         forM_ intervals $ \i -> do
             expireOldIntervals i
             trackFree i
@@ -75,8 +78,10 @@ allocateLinearScan dict live asap p@(I.Proc {I.entry = e, I.body = g, I.name = n
 --    trace "\n-- REGISTER ALLOCATION --" $
 --      trace (intercalate "\n" $ map show $ M.toList t) $
 --        trace (intercalate "\n" $ map show $ M.toList s) $
+--          trace "PRE-INTERVALS" $
+--            trace (intercalate "\n" $ map show preintervals) $
+--              return ()
 --          trace (intercalate "\n" $ map show $ M.toList f) $
---            return ()
 
     return $ RegAllocation t s f nl 
 
@@ -92,12 +97,16 @@ allocateLinearScan dict live asap p@(I.Proc {I.entry = e, I.body = g, I.name = n
       addActive i =
         modify (\st -> st {actives = sortBy (intervalCmpE (lcmp st)) (i:(actives st))})
 
+      preallocate :: [(Interval, R)] -> StateT RegAllocSt I.M ()
+      preallocate a = mapM_ (allocate.fst) a
+
       allocate :: Interval -> StateT RegAllocSt I.M ()
-      allocate i = do
-        st@(RegAllocSt{regPool=(r:rs), regAlloc = ra}) <- get -- FIXME ?
-        put st {regPool=rs, regAlloc=M.insert i r ra}
-        trackReg i r
---        trace ("REG. ALLOC " ++ (show (fst i)) ++ " " ++ show r) $ return ()
+      allocate i@(n,_) = do
+        already <- gets (M.member i . regAlloc)
+        when (not already) $ do
+          st@(RegAllocSt{regPool=(r:rs), regAlloc = ra}) <- get -- FIXME ?
+          put st {regPool=rs, regAlloc=M.insert i r ra}
+          trackReg i r
 
       deallocate :: Interval -> StateT RegAllocSt I.M ()
       deallocate i = do
@@ -210,7 +219,7 @@ allocateLinearScan dict live asap p@(I.Proc {I.entry = e, I.body = g, I.name = n
 
       useOf (I.Assign n n1) (l, v) = (l, factIns' n l v `M.union` factIns' n1 l v)
       useOf (I.Const _ n) (l, v)  = (l, factIns' n l v)
-      useOf (I.Call _ (I.Closure n1) _ n) (l, v) = (l, factIns' n l v `M.union` factIns' n1 l v) -- FIXME: also count the args
+      useOf (I.Call _ (I.Closure n1 _) _ n) (l, v) = (l, factIns' n l v `M.union` factIns' n1 l v) -- FIXME: also count the args
       useOf (I.Call _ _ _ n) (l, v) = (l, factIns' n l v) -- FIXME: also count the args ?
       useOf (I.Label n) (_, v) = (n, v)
       useOf _ x = x
