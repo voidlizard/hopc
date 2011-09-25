@@ -6,6 +6,7 @@ import qualified Data.ByteString as BS
 
 import Data.Either
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Data.List
 import Control.Monad.Error
 import Compilers.Hopc.Frontend.Lisp.Parse
@@ -81,7 +82,8 @@ main = do
 
                    x <- return $ runM $ do
                                    live <- L.live e g
-                                   alloc <- R.allocateLinearScan dict live p
+                                   let asap = spillASAP dict live p
+                                   alloc <- R.allocateLinearScan dict live asap p
                                    fromIR dict live alloc p
 
                    let (Proc{V.name=n, arity=ar, slotnum=sn, V.body=ops}) = x

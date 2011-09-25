@@ -4,6 +4,7 @@
 module Compilers.Hopc.Backend.TinyC.VM (
     module Compilers.Hopc.Backend.TinyC.VM.Types
   , fromIR
+  , spillASAP
   ) where
 
 import Data.List
@@ -52,7 +53,7 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
       spill <- spillAtBlock n
       chunkM $ Label n : spill
 
-    trNode x@(I.Call _ ct _ _) = varType (callvar ct) >>= callOf x
+    trNode x@(I.Call _ ct _ _) = return (varType (callvar ct) dict) >>= callOf x
  
     trNode (I.Const c n) = do
       r <- reg n
@@ -76,7 +77,7 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
       unsp <- unspill activationRecordVariable (Just closureReg)
       rv <- reg n
       let ret = case ur of
-                []  -> unsp ++ [Move rv R1, Return]
+                []  -> Move rv R1 : unsp ++ [Return]
                 x   -> ur ++ unsp ++ [Return]
       chunkM ret
 
@@ -125,7 +126,6 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
                 succSlot
                 modify(\s -> s{rsFree=r:rsFree s, rsSpill = M.insert n i (rsSpill s)})
                 chunkMs sp
-
 
     spillReg :: TrM TOp
     spillReg = do
@@ -216,15 +216,6 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
     emptyM :: TrM TOp
     emptyM = return $ []
 
-    varType :: KId -> TrM HType 
-    varType n = do
-      tp <- asks (M.lookup n . rdict)
-      when ((not.isJust) tp) $ error $ "COMPILER ERROR NO TYPE FOR VAR " ++ n --- FIXME
-      return $ fromJust tp
-
-    callvar (I.Closure n) = n
-    callvar (I.Direct n) = n
-
     initR :: REnv
     initR = REnv ra dict live
 
@@ -241,8 +232,6 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
             flat' = withBlocks bmap nr ++ concatMap revert r
             br = S.fromList $ foldl bra [] flat' 
             flat = rmBranches $ filter (skipLabels br) flat'
---                    flat = flat' 
-
         in Label e : flat
       where wl ((Label l):xs) = Just (l, xs)
             wl _                = Nothing
@@ -309,6 +298,39 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
 --    printN :: forall e x . Insn e x -> I.M ()
 --    printN x = do
 --        trace (printf "%-60s ;" (show x)) $ return ()
+
+--spillASAP :: TDict -> FactBase Live -> I.Proc -> RegAllocation -> S.Set KId
+--spillASAP dict live p (RegAllocation{spill=sp}) = graph -- `S.intersection` alloc
+--  where all = foldl S.union S.empty $ M.elems sp
+--        alloc = S.map (\(a, _, _) -> a) all
+--        graph = spillASAP' dict live p
+
+spillASAP :: TDict -> FactBase Live -> I.Proc -> S.Set KId 
+spillASAP dict live (I.Proc{I.body=g, I.args=as}) = ofProc $ foldGraphNodes node g S.empty
+  where 
+    node :: forall e x . Insn e x -> S.Set KId -> S.Set KId 
+    node (I.Call l ct _ _ ) acc = varsOf l (varType (callvar ct) dict) `S.union` acc
+    node x acc = acc
+
+    varsOf :: Label -> HType -> S.Set KId
+    varsOf l (TFun TFunLocal _ _) = maybe S.empty id $ lookupFact l live
+    varsOf l _ = S.empty
+
+    ofProc :: S.Set KId -> S.Set KId
+    ofProc asap = spills `S.intersection` asap 
+
+    spills = S.fromList $ activationRecordVariable:as
+
+varType :: KId -> TDict -> HType 
+varType n rdict =
+  let tp = M.lookup n rdict
+  in if ((not.isJust) tp)
+     then error $ "COMPILER ERROR NO TYPE FOR VAR " ++ n --- FIXME
+     else fromJust tp
+
+callvar :: I.CallT -> KId
+callvar (I.Closure n) = n
+callvar (I.Direct n) = n
 
 data REnv = REnv { regalloc :: RegAllocation
                  , rdict :: TDict

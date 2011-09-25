@@ -1,0 +1,13 @@
+
+($ foreign "display" display ((:int) :unit) $)
+
+(define (put x) (display x))
+
+(define (qqq a b c) 
+    (put a)
+    (put b)
+    (put c)
+)
+
+(qqq 5 6 7)
+

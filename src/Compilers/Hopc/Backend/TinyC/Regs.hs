@@ -34,10 +34,11 @@ import Compiler.Hoopl
 import Debug.Trace
 import Text.Printf 
 
-allocateLinearScan :: TDict -> FactBase Live -> I.Proc -> I.M RegAllocation
-allocateLinearScan dict live p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}) = do
+allocateLinearScan :: TDict -> FactBase Live -> S.Set KId -> I.Proc -> I.M RegAllocation
+allocateLinearScan dict live asap p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}) = do
     let (GMany _ bbb _) = g
     let prep = M.fromList $ zip (activationRecordVariable:as) (repeat e)
+    let asap = M.keysSet prep 
     let blocks = postorder_dfs_from bbb e
     let labels  = concatMap (\b -> foldBlockNodesF labelOf b []) blocks
     let labelsOrd = M.fromList $ zip labels [0..] :: M.Map Label Int
@@ -64,6 +65,7 @@ allocateLinearScan dict live p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.a
             if an >= regsN
               then spillAtInterval i
               else allocate i >> addActive i
+            spillASAP i
 
 --    trace "-- LABELS --" $
 --      trace ( intercalate "\n" $ map show $ M.toList labelsOrd ) $ do
@@ -95,6 +97,13 @@ allocateLinearScan dict live p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.a
         trackReg i r
 --        trace ("REG. ALLOC " ++ (show (fst i)) ++ " " ++ show r) $ return ()
 
+      deallocate :: Interval -> StateT RegAllocSt I.M ()
+      deallocate i = do
+        st@(RegAllocSt{regPool=rp, regAlloc = ra}) <- get
+        when (M.member i ra) $ do
+            let r = fromJust $ M.lookup i ra
+            put st {regPool=rp++[r], regAlloc=M.delete i ra}
+
       delActive :: Interval -> StateT RegAllocSt I.M ()
       delActive i = do
         st@(RegAllocSt{actives=a}) <- get
@@ -123,6 +132,18 @@ allocateLinearScan dict live p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.a
         let l = fromJust $ M.lookup spill ls
         let s' = maybe (S.singleton (k,r,l)) (\s'' -> S.insert (k,r,l) s'') (M.lookup i mt)
         put st {spillTrack = M.insert i s' mt}
+
+      spillASAP :: Interval -> StateT RegAllocSt I.M ()
+      spillASAP i@(n, (l1, _)) = do
+        when (S.member n asap) $ do
+          allocated <- gets (M.member i . regAlloc)
+          when allocated $ do
+--            trace ("SPILL-ASAP! " ++ show i) $ return ()
+            r <- gets (M.lookup i . regAlloc)
+            newLocation i
+            delActive i
+            deallocate i
+            trackSpill i i (fromJust r)
 
       spillAtInterval :: Interval -> StateT RegAllocSt I.M ()
       spillAtInterval i = do
@@ -182,8 +203,8 @@ allocateLinearScan dict live p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.a
 
       useOf (I.Assign n n1) (l, v) = (l, factIns' n l v `M.union` factIns' n1 l v)
       useOf (I.Const _ n) (l, v)  = (l, factIns' n l v)
-      useOf (I.Call _ (I.Closure n1) _ n) (l, v) = (l, factIns' n l v `M.union` factIns' n1 l v)
-      useOf (I.Call _ _ _ n) (l, v) = (l, factIns' n l v)
+      useOf (I.Call _ (I.Closure n1) _ n) (l, v) = (l, factIns' n l v `M.union` factIns' n1 l v) -- FIXME: also count the args
+      useOf (I.Call _ _ _ n) (l, v) = (l, factIns' n l v) -- FIXME: also count the args ?
       useOf (I.Label n) (_, v) = (n, v)
       useOf _ x = x
 
