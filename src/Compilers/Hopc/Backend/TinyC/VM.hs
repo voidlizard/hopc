@@ -29,7 +29,7 @@ import Compilers.Hopc.Backend.TinyC.VM.Types
 --import Compilers.Hopc.Backend.TinyC.Regs
 import qualified Compilers.Hopc.Backend.TinyC.IR as I
 
-fromIR :: TDict -> FactBase Live -> RegAllocation -> I.Proc -> I.M Proc
+fromIR :: TDict -> FactBase Live -> RegAllocation -> I.Proc -> M Proc
 
 fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}) = do
   let (GMany _ bbb _) = g
@@ -419,7 +419,7 @@ data REnvSt  = REnvSt { rsLabel :: Label
                       , rsMerge :: TOp -> TOp -> TOp
                       }
 
-type TrM = StateT REnvSt (ReaderT REnv I.M)
+type TrM = StateT REnvSt (ReaderT REnv M)
 type TOp = [Op]
 
 data C3 = C3 { blocks :: M.Map Label (Either [Op] [Op]) }

@@ -19,12 +19,12 @@ import Control.Monad
 
 import Compiler.Hoopl hiding (Block)
 
-optimize :: (I.Proc -> I.M a) -> I.Proc -> CompileM a
+optimize :: (I.Proc -> M a) -> I.Proc -> CompileM a
 optimize f b = do
    return (runSimpleUniqueMonad $ runWithFuel 99999 (f b))
 
 
-deadAssignElim :: I.Proc -> I.M I.Proc
+deadAssignElim :: I.Proc -> M I.Proc
 deadAssignElim p@(I.Proc { I.entry = entry, I.body = g }) = do
     (g', _, _) <- analyzeAndRewriteBwd bwd (JustC [entry]) g mapEmpty
     return p { I.body = g' }

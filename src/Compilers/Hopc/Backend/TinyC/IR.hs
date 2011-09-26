@@ -10,8 +10,6 @@ import Compilers.Hopc.Compile
 import Compilers.Hopc.Id (KId)
 import Compilers.Hopc.Backend.TinyC.Lit
 
-type M = CheckingFuelMonad (SimpleUniqueMonad) 
-
 data CallT = Direct KId Bool  | Closure KId Bool
 
 data Insn e x where
@@ -36,9 +34,6 @@ instance NonLocal Insn where
 
 
 data Proc = Proc { name :: KId, args :: [KId], entry :: Label, body :: Graph Insn C C }
-
-runM :: M a -> a
-runM m = runSimpleUniqueMonad $ runWithFuel 0 m
 
 instance Show (Insn e x) where
   show (Label lbl)      = show lbl ++ ":"

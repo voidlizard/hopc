@@ -73,8 +73,6 @@ conv2 k' = do
 
     let finit@(C2{cfree = fs}) = initf init (M.fromList fv)
 
-    liftIO $ print fs
-
     let f n = maybe [] id (M.lookup n fs)
     let fv2 n k = k 
     let g n = S.member n glob
@@ -98,8 +96,6 @@ conv2 k' = do
 
     (cl', s) <- runStateT (rewriteBiM (r (C3 f g fb rn fv2 )) cl) (M.empty)
 
-    liftIO $ putStrLn (prettyShow cl')
-
     let fs2 = M.fromList $ [(f, p) | CFun p@(Fun f args free bdy) <- universe cl']
     let f2  n = maybe [] (\(Fun _ _ f _) -> f) (M.lookup n fs2)
     let fb2 n = M.lookup n fs2
@@ -112,8 +108,6 @@ conv2 k' = do
     (cl'', s) <- runStateT (rewriteBiM (r (C3 f2 g fb2 rn flt)) ct) (M.empty)
 
     let bs = [(fn, p) | (CFun p@(Fun fn args free b)) <- universe cl'']
-
-    liftIO $ print rl'
 
     entries <- getEntries
 
@@ -137,12 +131,6 @@ conv2 k' = do
                _                   -> error $ "COMPILER ERROR / TYPE ERROR [CALL OF NOT APPLICABLE] " ++ n
 
         addEntry False fn nf
-
-        liftIO $ putStrLn $ "JUST ADDED ENTRY " ++ fn ++ " " ++ (show nf)
-
-        liftIO $ print (tn : tf)
-
-    liftIO $ putStrLn "DONE"
 
     return cl''
 

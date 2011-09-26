@@ -34,7 +34,7 @@ import Compiler.Hoopl
 import Debug.Trace
 import Text.Printf 
 
-allocateLinearScan :: TDict -> FactBase Live -> S.Set KId -> I.Proc -> I.M RegAllocation
+allocateLinearScan :: TDict -> FactBase Live -> S.Set KId -> I.Proc -> M RegAllocation
 allocateLinearScan dict live asap p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}) = do
     let (GMany _ bbb _) = g
     let args = activationRecordVariable:as
@@ -88,19 +88,19 @@ allocateLinearScan dict live asap p@(I.Proc {I.entry = e, I.body = g, I.name = n
     where
       initRegAlloc f = RegAllocSt f [] R.allRegs M.empty 0 M.empty M.empty M.empty M.empty
 
-      activeN :: StateT RegAllocSt I.M Int
+      activeN :: StateT RegAllocSt M Int
       activeN = gets actives >>= return . length
 
       regsN = (length $ (R.allRegs :: [R]))
 
-      addActive :: Interval -> StateT RegAllocSt I.M ()
+      addActive :: Interval -> StateT RegAllocSt M ()
       addActive i =
         modify (\st -> st {actives = sortBy (intervalCmpE (lcmp st)) (i:(actives st))})
 
-      preallocate :: [(Interval, R)] -> StateT RegAllocSt I.M ()
+      preallocate :: [(Interval, R)] -> StateT RegAllocSt M ()
       preallocate a = mapM_ (allocate.fst) a
 
-      allocate :: Interval -> StateT RegAllocSt I.M ()
+      allocate :: Interval -> StateT RegAllocSt M ()
       allocate i@(n,_) = do
         already <- gets (M.member i . regAlloc)
         when (not already) $ do
@@ -108,20 +108,20 @@ allocateLinearScan dict live asap p@(I.Proc {I.entry = e, I.body = g, I.name = n
           put st {regPool=rs, regAlloc=M.insert i r ra}
           trackReg i r
 
-      deallocate :: Interval -> StateT RegAllocSt I.M ()
+      deallocate :: Interval -> StateT RegAllocSt M ()
       deallocate i = do
         st@(RegAllocSt{regPool=rp, regAlloc = ra}) <- get
         when (M.member i ra) $ do
             let r = fromJust $ M.lookup i ra
             put st {regPool=rp++[r], regAlloc=M.delete i ra}
 
-      delActive :: Interval -> StateT RegAllocSt I.M ()
+      delActive :: Interval -> StateT RegAllocSt M ()
       delActive i = do
         st@(RegAllocSt{actives=a}) <- get
         let a' = delete i a
         put st{actives=a'}
 
-      updateReg :: Interval -> Maybe R -> StateT RegAllocSt I.M ()
+      updateReg :: Interval -> Maybe R -> StateT RegAllocSt M ()
       updateReg i (Just r) = do
         modify (\st -> st{ regAlloc = M.insert i r (regAlloc st)})
         trackReg i r
@@ -129,12 +129,20 @@ allocateLinearScan dict live asap p@(I.Proc {I.entry = e, I.body = g, I.name = n
 
       updateReg _ Nothing = return ()
 
+<<<<<<< HEAD
       trackFree :: Interval -> StateT RegAllocSt I.M ()
+=======
+      trackFree :: Interval -> StateT RegAllocSt M ()
+>>>>>>> hoopl_toplevel
       trackFree (_, (l1, _)) = do
         r <- gets regPool
         modify (\s -> s {freeTrack = M.insert l1 r (freeTrack s)})
 
+<<<<<<< HEAD
       trackReg :: Interval -> R -> StateT RegAllocSt I.M ()
+=======
+      trackReg :: Interval -> R -> StateT RegAllocSt M ()
+>>>>>>> hoopl_toplevel
       trackReg (n, (l1, _)) r = do
         m1 <- gets (M.lookup l1 . regTrack) >>= return . maybe (M.empty) id
         let m2 = M.insert n r m1
@@ -142,14 +150,14 @@ allocateLinearScan dict live asap p@(I.Proc {I.entry = e, I.body = g, I.name = n
 --        trace ("TRACK REG / FREE POOL " ++ show l1) $ trace ( show r ) $ return ()
         modify (\s -> s {regTrack = M.insert l1 m2 (regTrack s), freeTrack = M.insert l1 r (freeTrack s)})
 
-      trackSpill :: Interval -> Interval -> R -> StateT RegAllocSt I.M ()
+      trackSpill :: Interval -> Interval -> R -> StateT RegAllocSt M ()
       trackSpill (n, (i,_)) spill@(k, _) r = do
         st@(RegAllocSt{spillTrack=mt, locations=ls}) <- get
         let l = fromJust $ M.lookup spill ls
         let s' = maybe (S.singleton (k,r,l)) (\s'' -> S.insert (k,r,l) s'') (M.lookup i mt)
         put st {spillTrack = M.insert i s' mt}
 
-      spillASAP :: Interval -> StateT RegAllocSt I.M ()
+      spillASAP :: Interval -> StateT RegAllocSt M ()
       spillASAP i@(n, (l1, _)) = do
         when (S.member n asap) $ do
           allocated <- gets (M.member i . regAlloc)
@@ -161,7 +169,7 @@ allocateLinearScan dict live asap p@(I.Proc {I.entry = e, I.body = g, I.name = n
             deallocate i
             trackSpill i i (fromJust r)
 
-      spillAtInterval :: Interval -> StateT RegAllocSt I.M ()
+      spillAtInterval :: Interval -> StateT RegAllocSt M ()
       spillAtInterval i = do
         cmp <- gets lcmp
         spill <- gets (last.actives)
@@ -192,7 +200,7 @@ allocateLinearScan dict live asap p@(I.Proc {I.entry = e, I.body = g, I.name = n
         st@(RegAllocSt{location=n, locations=ls}) <- get
         put st {location=(n+1), locations = M.insert i n ls}
 
-      expireOldIntervals :: Interval -> StateT RegAllocSt I.M ()
+      expireOldIntervals :: Interval -> StateT RegAllocSt M ()
       expireOldIntervals i = do
         st@(RegAllocSt{lcmp=cmp, actives=a, regAlloc=ra, regPool=rp}) <- get
         let (expired, rest) = partition (\j -> cmp (endp j) (startp i) == LT) (sortBy (intervalCmpE cmp) a)

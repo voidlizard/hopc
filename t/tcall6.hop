@@ -1,0 +1,13 @@
+
+($ foreign "display" display ((:string) :unit) $)
+
+(define (one x) (display x))
+
+(let ((a "A")) 
+	(begin
+		(one a)
+		(one a)
+	)
+)
+
+
