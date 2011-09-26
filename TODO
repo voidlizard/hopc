@@ -1,7 +1,13 @@
 
-FIXME: make-closure  в хвостовой позиции после closure convetion. Что-то с этим сделать.
+TODO: Генерация замыканий
 
-TODO: Удалить VM, FromClosure, FromVM. Строить IR непосредственно из Closure
+TODO: Вызов замыканий
+
+TODO: Генерация C
+
+TODO: Многозадачность
+
+TODO: GC
 
 TODO: Обработка неизвестых переменных
 
