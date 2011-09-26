@@ -129,20 +129,11 @@ allocateLinearScan dict live asap p@(I.Proc {I.entry = e, I.body = g, I.name = n
 
       updateReg _ Nothing = return ()
 
-<<<<<<< HEAD
-      trackFree :: Interval -> StateT RegAllocSt I.M ()
-=======
-      trackFree :: Interval -> StateT RegAllocSt M ()
->>>>>>> hoopl_toplevel
       trackFree (_, (l1, _)) = do
         r <- gets regPool
         modify (\s -> s {freeTrack = M.insert l1 r (freeTrack s)})
 
-<<<<<<< HEAD
-      trackReg :: Interval -> R -> StateT RegAllocSt I.M ()
-=======
       trackReg :: Interval -> R -> StateT RegAllocSt M ()
->>>>>>> hoopl_toplevel
       trackReg (n, (l1, _)) r = do
         m1 <- gets (M.lookup l1 . regTrack) >>= return . maybe (M.empty) id
         let m2 = M.insert n r m1
