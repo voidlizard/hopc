@@ -54,7 +54,7 @@ main = do
     (x:_) <- getArgs
     input x $ \s -> dumpResult $ runM $ do
         st <- runCompile initCompile $ do
-          k  <- parseTop s >>= K.kNormalizeTop >>= A.alphaConv
+          k  <- parseTop s >>= K.kNormalizeTop
           k' <- A.alphaConv k
           constr2 <- getConstraints
           constr <- KT.constraints k'
@@ -64,8 +64,8 @@ main = do
                             >>= B.betaReduceM
                             >>= L.flattenM
           c1 <- C.conv2 k'' >>= E.eliminate
-          dict <- getEntries
           procs <- FC.convert c1
+          dict <- getEntries
           vm <- forM procs $ \p@(I.Proc {I.name = n, I.body = g, I.entry = e}) -> do
                   live <- lift $ L.live e g
                   let asap = spillASAP dict live p
@@ -91,7 +91,7 @@ dumpResult (Right ((RVm p), _)) =
     putStrLn $ intercalate "\n" $ map show body
 
 dumpResult (Right _) = error "Got some positive results but don't know what to do with them"
-dumpResult (Left e) = error "Got some error dirung the compilation"
+dumpResult (Left x) = print x
 
 reportStatus (Left x)  = print x
 reportStatus (Right x) = error "finished?"
