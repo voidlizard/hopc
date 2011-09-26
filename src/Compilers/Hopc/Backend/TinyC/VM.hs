@@ -356,16 +356,16 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
             withMaybe Nothing d f = d
 
     analyzeTailCall :: Label -> I.CallT -> HType -> Bool
---    analyzeTailCall l (I.Direct fn _) (TFun TFunLocal _ _) | n == fn =
---      let (GMany _ b _ ) = g
---      in foldl (\a b -> foldBlockNodesF node b a) True (postorder_dfs_from b l)
---      where
---        node :: forall e x . Insn e x -> Bool -> Bool
---        node (I.Label _)  a = a && True
---        node (I.Branch _) a = a && True
---        node (I.Assign v _) a | v == retvalVariable = a && True
---        node (I.Return _) a = a && True
---        node _ a = a && False
+    analyzeTailCall l (I.Direct fn _) (TFun TFunLocal _ _) | n == fn =
+      let (GMany _ b _ ) = g
+      in foldl (\a b -> foldBlockNodesF node b a) True (postorder_dfs_from b l)
+      where
+        node :: forall e x . Insn e x -> Bool -> Bool
+        node (I.Label _)  a = a && True
+        node (I.Branch _) a = a && True
+        node (I.Assign v _) a | v == retvalVariable = a && True
+        node (I.Return _) a = a && True
+        node _ a = a && False
     
     analyzeTailCall _ _ _ = False
 
