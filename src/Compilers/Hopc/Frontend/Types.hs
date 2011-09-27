@@ -38,7 +38,7 @@ instance TType HType  where
     isVar x         = False
 
     merge (TFun _ args1 r1) (TFun _ args2 r2) = Just $ (zip args1 args2) ++ [(r1, r2)]
-    merge x y = trace ("TRACE: merge " ++ (show x) ++ " " ++ (show y)) $ Nothing
+    merge x y = Nothing
 
     typeid (TVar  s)  = s
     typeid (TAny  s)  = s

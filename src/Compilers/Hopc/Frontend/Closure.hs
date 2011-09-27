@@ -211,9 +211,9 @@ conv2 k' = do
           r c x = return Nothing
 
           rself :: (KId -> Maybe KId) -> (KId -> [KId]) -> Closure -> Maybe Closure
-          rself nr fv (CApplCls n args) = trace ("TRACE rself " ++ n) $
+          rself nr fv (CApplCls n args) =
             let nm = nr (fname n)
-            in trace ("NM " ++ (show nm)) $ case nm of
+            in case nm of
                 Just x | x == n -> Just $ CApplDir (fname n) $ args ++ (fv (fname n))
                 _ -> Nothing
 
@@ -263,7 +263,7 @@ data Elim = Elim { elenv :: S.Set KId }
 type ElimM = StateT Elim CompileM
 
 eliminate :: Closure -> CompileM Closure
-eliminate k = trace "TRACE: eliminate" $
+eliminate k = do 
     evalStateT (descendBiM tr k) init
     where tr :: Closure -> ElimM Closure
 

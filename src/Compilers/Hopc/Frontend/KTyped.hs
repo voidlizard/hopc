@@ -38,12 +38,11 @@ constraints k = do
                 return $ (TVar n, tp)
 
           constr (KLambda args _) = do
-            forM_ args $ \n -> trace ("TRACE: constr mem " ++ (show n)) $ mem n (TVar n)
+            forM_ args $ \n -> mem n (TVar n)
             return []
 
           constr (KApp n e) = do
             fn <- remem' n
-            trace ("TRACE: KApp " ++ (show e)) $ return ()
             wtf <- get
             case fn of
                 Just (TFun _ at rt) -> return $ zipWith (\a b -> (TVar a, b)) e at

@@ -1,7 +1,7 @@
 
-($ foreign "display" display ((:string) :int) $)
-($ foreign "newline" newline ((:unit) :int)   $)
-($ foreign "sleep"   sleep   ((:int) :)       $)
+($ foreign "display" display ((:string) :unit) $)
+($ foreign "newline" newline ((:unit) :unit)   $)
+($ foreign "sleep"   sleep   ((:int) :unit )  $)
 
 (define (pysh s) (display s))
 

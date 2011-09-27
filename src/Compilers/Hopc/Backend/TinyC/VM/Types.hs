@@ -44,6 +44,7 @@ data Proc = Proc { name :: KId
                  , arity :: Int
                  , slotnum :: Int
                  , body :: [Op]
+                 , entrypoint :: Label
                  }
             deriving (Show)
 

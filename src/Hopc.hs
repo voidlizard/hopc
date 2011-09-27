@@ -5,6 +5,7 @@ import System.IO (stdin)
 import qualified Data.ByteString as BS
 
 import Data.Either
+import Data.Maybe
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.List
@@ -67,13 +68,15 @@ main = do
           c1 <- C.conv2 k'' >>= E.eliminate
           procs <- FC.convert c1
           dict <- getEntries
+          ep <- getEntryPoint >>= return.fromJust
           vm <- forM procs $ \p@(I.Proc {I.name = n, I.body = g, I.entry = e}) -> do
                   live <- lift $ L.live e g
                   let asap = spillASAP dict live p
                   alloc <- lift $ R.allocateLinearScan dict live asap p
                   lift $ fromIR dict live alloc p
-          code <- W.write vm
+          code <- W.write ep vm
           return $ RCCode code
+--          return $ RVm vm
         return st
 
 input "-" fn = BS.hGetContents stdin >>= fn

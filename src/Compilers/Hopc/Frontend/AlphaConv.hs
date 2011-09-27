@@ -67,7 +67,7 @@ alphaConv k = evalStateT (descendBiM tr k) aInitState
             put st { aTp = M.insert n t tps}
 
             st2@(AlphaConv {aTp = tps}) <- get
-            trace ("TRACE: KSpecial tps " ++ (show st2)) $ return ()
+--            trace ("TRACE: KSpecial tps " ++ (show st2)) $ return ()
 
             return KUnit
 
@@ -82,7 +82,7 @@ alphaConv k = evalStateT (descendBiM tr k) aInitState
               let n = M.lookup s env
               let tp = M.lookup s tps
 
-              trace ("TRACE: getVar " ++  s ++ " " ++ (show n) ++ " "  ++ (show tp)) $ return ()
+--              trace ("TRACE: getVar " ++  s ++ " " ++ (show n) ++ " "  ++ (show tp)) $ return ()
 
               case (n, tp) of
                 (Just nv, Just t) -> (lift $ addEntry False nv t) >> put st {aTp = M.delete nv tps}
