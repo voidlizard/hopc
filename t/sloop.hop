@@ -11,7 +11,7 @@
     (display "PREVED")
     (newline)
     (pysh "PYSH")
-    (sleep 13)
+    (sleep 1)
     (main)
 )
 

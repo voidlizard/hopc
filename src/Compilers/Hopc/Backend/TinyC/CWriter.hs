@@ -16,6 +16,7 @@ import Data.List
 import Data.Maybe
 import qualified Data.Map as M
 import qualified Data.Set as S
+import Data.Char
 import Control.Monad.Writer
 import Control.Monad.Reader
 import Control.Monad.State
@@ -42,10 +43,28 @@ write ep p = runCWriterM  envInit $ do
       cp <- asks checkpoints
       forM_ (M.toList cp) $ \(l, n) -> do
         noindent $ printf "#define %s %d" (decorateCaseLbl (show l)) n
+
+      empty
+
+      sc <- asks strings 
+      forM_ (M.toList sc) $ \(s, n) -> do
+        comment $ show s
+        noindent $ stmt $ printf "const unsigned %s[] = %s" n (sencode s)
+
       empty
 
     epilogue :: CWriterM ()
-    epilogue = nothing
+    epilogue = do
+      empty
+      empty
+      indent $ "int main() {"
+      pushIndent
+      indent $ stmt $ "static hopc_runtime runtime"
+      empty
+      indent $ stmt $ "hopc_entrypoint(&runtime)"
+      indent $ stmt $ "return 0"
+      popIndent 
+      indent $ "}"
 
     entrypoint :: CWriterM () -> CWriterM () 
     entrypoint m = do
@@ -162,6 +181,10 @@ write ep p = runCWriterM  envInit $ do
 
     opcode _ (Const (LInt v) r) = shift $ stmt $ reg r ++ " = " ++ iconst v
 
+    opcode _ (Const (LStr s) r) = do
+      sname <- asks (fromJust . M.lookup s . strings) -- FIXME: must mork
+      shift $ stmt $ reg r ++ " = (unsigned)" ++ sname
+
     opcode _ (Move r1 r2) = shift $ stmt $ reg r2 ++ " = " ++ reg r1
 
     opcode _ (CallL l n _ _) = do
@@ -181,10 +204,12 @@ write ep p = runCWriterM  envInit $ do
       empty
 
     opcode _ (Spill r n) = do
-      shiftIndent $ comment $ "spill " ++ reg r ++ " " ++ show n
+--      shiftIndent $ comment $ "spill " ++ reg r ++ " " ++ show n
+      shift $ stmt $ printf "hopc_spill(runtime, %d, %s)" n (reg r)
 
     opcode _ (Unspill n r) = do
-      shiftIndent $ comment $ "unspill " ++ reg r ++ " " ++ show n
+--      shiftIndent $ comment $ "unspill " ++ reg r ++ " " ++ show n
+      shift $ stmt $ printf "%s = hopc_unspill(runtime, %d)" (reg r) n
 
     opcode _ (BranchTrue r l) = do
       shift $ stmt $ printf "if(%s) %s" (reg r) (goto l)
@@ -208,6 +233,10 @@ write ep p = runCWriterM  envInit $ do
     popIndent :: CWriterM ()
     popIndent = modify pred
 
+    sencode :: String -> String 
+    sencode s = "{" ++ enc ++ "}"
+      where enc = intercalate "," $ map (printf "0x%02X") $ length s : map ord s ++ [0]
+
     funEntry :: KId -> CWriterM Label
     funEntry n =
       asks (M.lookup n.entrypoints) >>= return.fromJust --- FIXME: must always work. but code is dirty
@@ -215,7 +244,7 @@ write ep p = runCWriterM  envInit $ do
     entrypointsMap =
       M.fromList $ map (\p@(Proc{name=fn, entrypoint=l}) -> (fn, l)) p
 
-    envInit = CWriterEnv entrypointsMap (checkpointsMap entrypointsMap)
+    envInit = CWriterEnv entrypointsMap (checkpointsMap entrypointsMap) sconsts
 
     checkpointsMap eps =
       let labels = foldl labelOf [] $ concatMap body p
@@ -229,8 +258,17 @@ write ep p = runCWriterM  envInit $ do
 --            ref acc (CallF l _ _ _) = acc ++ [l]
             ref acc _ = acc
 
+    sconsts = 
+      let ss = foldl s [] $ concatMap body p
+      in M.fromList $ zip (S.toList $ S.fromList ss) ["sConst" ++ show x |x <- [0..]]
+      where s acc (Const (LStr s) _) = s : acc
+            s acc _ = acc
+
 type CWriterM = StateT Int (WriterT [String] (ReaderT CWriterEnv CompileM))
-data CWriterEnv = CWriterEnv {entrypoints :: M.Map KId Label, checkpoints :: M.Map Label Int}
+data CWriterEnv = CWriterEnv { entrypoints :: M.Map KId Label
+                             , checkpoints :: M.Map Label Int
+                             , strings :: M.Map String String
+                             }
 
 runCWriterM :: CWriterEnv -> CWriterM a -> CompileM [String]
 runCWriterM env m = runReaderT (execWriterT (evalStateT m 0)) env

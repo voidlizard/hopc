@@ -48,6 +48,11 @@
         (display "11")
     )
 
+    (if (eq? (test) 12)
+        (display "ЖОПА КИТА")
+        (display "ПЕЧЕНЬ ТРЕСКИ")
+    )
+
     (main)
 
 )

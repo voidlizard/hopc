@@ -38,7 +38,8 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
 --  mapM_ printBlock blocks
 --  trace "---" $ return ()
 
-  (vm, st) <- flip runReaderT initR $ flip runStateT initS $
+  l <- freshLabel 
+  (vm, st) <- flip runReaderT initR $ flip runStateT (initS l) $
           liftM (wipeSnots . mergeBlocks e) $
             mapM (\b -> foldBlockNodesF (liftVM trNode) b emptyM) blocks
 
@@ -51,7 +52,9 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
     trNode (I.Label n) = do
       label n
       spill <- spillAtBlock n
-      chunkM $ Label n : spill
+      nl <- gets rsTLabel
+      let afterspill = if n == e then [Label nl] else []
+      chunkM $ Label n : spill ++ afterspill
 
     trNode x@(I.Call l ct _ _) = do
       let callT = varType (callvar ct) dict
@@ -123,7 +126,8 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
       let regs = map (\n -> fromJust $ M.lookup n alc) as
       areload <- mapM reloadArg (zip regs args) >>= return . concat
       modify(\s -> s{rsMerge=skipOps})
-      chunkM $ r0 ++ areload ++ [Branch e]
+      nl <- gets rsTLabel
+      chunkM $ areload ++ [Branch nl]
 
     callOf call@(I.Call l (I.Direct n False) args r) (TFun TFunLocal _ rt) = do
       (spl, s) <- spillAlive l r
@@ -275,8 +279,8 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
     initR :: REnv
     initR = REnv ra dict live
 
-    initS :: REnvSt
-    initS = REnvSt e M.empty M.empty [] 0 0 mergeOp
+    initS :: Label -> REnvSt
+    initS l = REnvSt e M.empty M.empty [] 0 0 mergeOp l 
 
     mergeOp :: TOp -> TOp -> TOp
     mergeOp x y = x ++ y
@@ -417,6 +421,7 @@ data REnvSt  = REnvSt { rsLabel :: Label
                       , rsSlot  :: Int
                       , rsSlotMax :: Int
                       , rsMerge :: TOp -> TOp -> TOp
+                      , rsTLabel :: Label
                       }
 
 type TrM = StateT REnvSt (ReaderT REnv M)
