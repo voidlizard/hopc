@@ -43,9 +43,10 @@ import qualified Compilers.Hopc.Backend.TinyC.Opt as O
 import qualified Compilers.Hopc.Backend.TinyC.Regs as R
 import Compilers.Hopc.Backend.TinyC.VM
 import qualified Compilers.Hopc.Backend.TinyC.VM as V
+import qualified Compilers.Hopc.Backend.TinyC.CWriter as W
 
 
-data Results = RVm [V.Proc]
+data Results = RVm [V.Proc] | RCCode [String]
 
 runM :: M a -> a
 runM m = runSimpleUniqueMonad $ runWithFuel 0 m
@@ -71,7 +72,8 @@ main = do
                   let asap = spillASAP dict live p
                   alloc <- lift $ R.allocateLinearScan dict live asap p
                   lift $ fromIR dict live alloc p
-          return $ RVm vm
+          code <- W.write vm
+          return $ RCCode code
         return st
 
 input "-" fn = BS.hGetContents stdin >>= fn
@@ -89,6 +91,16 @@ dumpResult (Right ((RVm p), _)) =
     putStrLn ""
     putStrLn (printf "%s (%d) slotnum:%d" n arity sn)
     putStrLn $ intercalate "\n" $ map show body
+
+dumpResult (Right ((RCCode c), _)) = do
+  putStrLn ""
+  putStrLn $ intercalate "\n" c
+  putStrLn ""
+--  forM_ p $ \(V.Proc {V.name = n, V.arity = arity, V.slotnum = sn, V.body = body}) -> do
+--    putStrLn ""
+--    putStrLn (printf "%s (%d) slotnum:%d" n arity sn)
+--    putStrLn $ intercalate "\n" $ map show body
+
 
 dumpResult (Right _) = error "Got some positive results but don't know what to do with them"
 dumpResult (Left x) = print x
