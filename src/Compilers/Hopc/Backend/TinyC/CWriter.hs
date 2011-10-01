@@ -23,6 +23,7 @@ import Control.Monad.State
 import Control.Monad.Trans
 
 import Text.Printf
+import Debug.Trace
 
 write :: KId -> [Proc] -> CompileM [String]
 write ep p = runCWriterM  envInit $ do
@@ -37,8 +38,18 @@ write ep p = runCWriterM  envInit $ do
   where
     prologue :: CWriterM ()
     prologue = do
+
+--      let spillmap = M.fromList $ map (\x -> (name x, 2 + slotnum x)) p
+
       indent "#include <hopcruntime.h>"
       indent "#include \"hopcstubs.h\""
+
+      empty
+
+      comment "FIXME: more general way to allocate the heap"
+      indent $ "#define HOPCINITIALHEAPSIZE 8192 // words"
+      indent $ stmt $ "hword_t heap[HOPCINITIALHEAPSIZE] = { 0 }"
+
       empty
       cp <- asks checkpoints
       forM_ (M.toList cp) $ \(l, n) -> do
@@ -53,6 +64,19 @@ write ep p = runCWriterM  envInit $ do
 
       empty
 
+      indent $ "const hopc_tagdata tagdata[] = {"
+      indent $ "{WORDS(sizeof(hopc_task)), {0}}"
+
+      -- insert spill's tags
+      comment $ "spill tags"
+--      forM_ (M.toList spillmap) $ \(n, len) -> $ do
+--        indent $ "{}"
+
+      indent $ "}"
+      indent $ stmt ""
+
+      empty
+
     epilogue :: CWriterM ()
     epilogue = do
       empty
@@ -60,7 +84,16 @@ write ep p = runCWriterM  envInit $ do
       indent $ "int main() {"
       pushIndent
       indent $ stmt $ "static hopc_runtime runtime"
+
       empty
+
+      indent $ stmt $ "hopc_init_runtime(&runtime, heap, HOPCINITIALHEAPSIZE)"
+
+      empty
+
+      comment "root task"
+      indent $ stmt "hopc_insert_task(&runtime)";
+
       indent $ stmt $ "hopc_entrypoint(&runtime)"
       indent $ stmt $ "return 0"
       popIndent 
@@ -110,7 +143,7 @@ write ep p = runCWriterM  envInit $ do
     entrypointLabel = "entrypoint"
     exitpointLabel = "exitpoint"
 
-    regType = "unsigned register"
+    regType = "hword_t register"
 
     retReg = R0
 
@@ -153,13 +186,13 @@ write ep p = runCWriterM  envInit $ do
 
     activationRecord :: Proc -> CWriterM ()
     activationRecord p | (slotnum p) > 0 = 
-      shift $ stmt $ printf "hopc_allocate_activation_record(runtime, %d)" (slotnum p)
+      shift $ stmt $ printf "hopc_push_activation_record(runtime, 0)"    --"hopc_allocate_activation_record(runtime, %d)" (slotnum p)
 
     activationRecord _ = nothing
 
     deallocateActivationRecord :: Proc -> CWriterM ()
-    deallocateActivationRecord p | (slotnum p) > 0 = 
-      shift $ stmt $ printf "hopc_deallocate_activation_record(runtime)"
+    deallocateActivationRecord p | (slotnum p) > 0 =
+      shift $ stmt $ printf "hopc_pop_activation_record(runtime)"
 
     deallocateActivationRecord _ = nothing
 
@@ -171,11 +204,12 @@ write ep p = runCWriterM  envInit $ do
     opcode _ (Branch n) = branch n
 
     opcode p (Return) | (name p) == ep = do
-      shiftIndent $ comment $ "return from " ++ name p
       deallocateActivationRecord p
+      shiftIndent $ comment $ "return from " ++ name p
       shift $ goto' exitpointLabel
 
     opcode p (Return) = do
+      deallocateActivationRecord p
       shiftIndent $ comment $ "return from " ++ name p
       shift $ goto' entrypointLabel
 
@@ -183,7 +217,7 @@ write ep p = runCWriterM  envInit $ do
 
     opcode _ (Const (LStr s) r) = do
       sname <- asks (fromJust . M.lookup s . strings) -- FIXME: must mork
-      shift $ stmt $ reg r ++ " = (unsigned)" ++ sname
+      shift $ stmt $ reg r ++ " = (hword_t*)" ++ sname
 
     opcode _ (Move r1 r2) = shift $ stmt $ reg r2 ++ " = " ++ reg r1
 
@@ -263,6 +297,9 @@ write ep p = runCWriterM  envInit $ do
       in M.fromList $ zip (S.toList $ S.fromList ss) ["sConst" ++ show x |x <- [0..]]
       where s acc (Const (LStr s) _) = s : acc
             s acc _ = acc
+
+  
+    uniqSpillMap = undefined
 
 type CWriterM = StateT Int (WriterT [String] (ReaderT CWriterEnv CompileM))
 data CWriterEnv = CWriterEnv { entrypoints :: M.Map KId Label
