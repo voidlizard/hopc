@@ -14,6 +14,7 @@ import Compilers.Hopc.Backend.TinyC.Lit
 import Compiler.Hoopl
 import Data.List
 import Data.Maybe
+import Data.Tuple
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Char
@@ -26,20 +27,19 @@ import Text.Printf
 import Debug.Trace
 
 write :: KId -> [Proc] -> CompileM [String]
-write ep p = runCWriterM  envInit $ do
-
-      prologue
-      entrypoint $ forM_ p $ \p -> do
-        comment (name p)
-        forM_ (body p) (opcode p)
-        empty
-      epilogue
+write ep p = do
+      (tl, tref) <- uniqSpillTagMap 1
+      runCWriterM (envInit tl tref) $ do
+        prologue
+        entrypoint $ forM_ p $ \p -> do
+          comment (name p)
+          forM_ (body p) (opcode p)
+          empty
+        epilogue
 
   where
     prologue :: CWriterM ()
     prologue = do
-
---      let spillmap = M.fromList $ map (\x -> (name x, 2 + slotnum x)) p
 
       indent "#include <hopcruntime.h>"
       indent "#include \"hopcstubs.h\""
@@ -65,15 +65,31 @@ write ep p = runCWriterM  envInit $ do
       empty
 
       indent $ "const hopc_tagdata tagdata[] = {"
-      indent $ "{WORDS(sizeof(hopc_task)), {0}}"
+      shift $ " {WORDS(sizeof(hopc_task)), {0}}"
 
       -- insert spill's tags
+      tl <- asks spillTags
       comment $ "spill tags"
+      forM_ tl $ \(tagn, tagr) -> do
+        shift $ printf ",{%d, {0}} // %d" (tagSize tagr) tagn
 --      forM_ (M.toList spillmap) $ \(n, len) -> $ do
 --        indent $ "{}"
 
       indent $ "}"
       indent $ stmt ""
+
+      indent $ stmt "static hword_t localcallregs[HOPCREGNUM] = { 0 }"
+
+      empty
+ 
+      forM_ (zip (R.avail :: [R]) ([1..] :: [Int])) $ \(r,i) -> do
+        let args = [printf "x%d" m | m <- take i ([1..]::[Int])]
+        indent $ printf "#define LOCALCALLARGS%d(%s) \\" i (intercalate "," args)
+        forM_  (zip args [1..])$ \(s,j) -> do
+          shift $ printf "localcallregs[%d] = (%s) ; \\" (j :: Int) s
+        forM_  (zip (R.avail :: [R]) [1..i]) $ \(r,j) -> do
+          shift $ printf "%s = localcallregs[%d]; \\" (show r) (j::Int)
+        empty
 
       empty
 
@@ -83,7 +99,7 @@ write ep p = runCWriterM  envInit $ do
       empty
       indent $ "int main() {"
       pushIndent
-      indent $ stmt $ "static hopc_runtime runtime"
+      indent $ stmt $ "static hopc_runtime runtime = { .tagdata = tagdata }"
 
       empty
 
@@ -185,8 +201,9 @@ write ep p = runCWriterM  envInit $ do
       shift $ stmt $ printf "HOPC_CALLFFI(%s)" (intercalate "," (n:args' rs))
 
     activationRecord :: Proc -> CWriterM ()
-    activationRecord p | (slotnum p) > 0 = 
-      shift $ stmt $ printf "hopc_push_activation_record(runtime, 0)"    --"hopc_allocate_activation_record(runtime, %d)" (slotnum p)
+    activationRecord p | (slotnum p) > 0 = do
+      tag <- asks (fromJust . M.lookup (name p) . spillTagRefs)
+      shift $ stmt $ printf "hopc_push_activation_record(runtime, %d)" tag
 
     activationRecord _ = nothing
 
@@ -221,10 +238,13 @@ write ep p = runCWriterM  envInit $ do
 
     opcode _ (Move r1 r2) = shift $ stmt $ reg r2 ++ " = " ++ reg r1
 
-    opcode _ (CallL l n _ _) = do
+    opcode _ (CallL l n rs _) = do
       keepReturn l
       shiftIndent $ comment $ "local call " ++ n
       lbl <- funEntry n
+      when (not (null rs)) $
+        shift $ printf "LOCALCALLARGS%d(%s)" (length rs) (intercalate "," (map reg rs))
+ 
       shift $ goto lbl 
       empty
 
@@ -278,7 +298,7 @@ write ep p = runCWriterM  envInit $ do
     entrypointsMap =
       M.fromList $ map (\p@(Proc{name=fn, entrypoint=l}) -> (fn, l)) p
 
-    envInit = CWriterEnv entrypointsMap (checkpointsMap entrypointsMap) sconsts
+    envInit r t = CWriterEnv entrypointsMap (checkpointsMap entrypointsMap) sconsts r t
 
     checkpointsMap eps =
       let labels = foldl labelOf [] $ concatMap body p
@@ -298,14 +318,25 @@ write ep p = runCWriterM  envInit $ do
       where s acc (Const (LStr s) _) = s : acc
             s acc _ = acc
 
-  
-    uniqSpillMap = undefined
+    uniqSpillTagMap :: Int -> CompileM ([(Int, TagRecord)], M.Map KId Int)
+    uniqSpillTagMap ns = do
+      let tags = map tagOf p
+      let tagn = M.fromList $ zip (S.toList (S.fromList (map snd tags))) [ns..]
+      let tagl = map swap $ M.toList tagn
+      let tagref = M.fromList $ map (\(n,t) -> (n,fromJust (M.lookup t tagn))) tags
+      return (sortBy cmp tagl, tagref)
+      where tagOf (Proc{name=nm, slotnum=sn}) = (nm, TagRecord (2+sn)) -- FIXME: constant hardcoding!
+            cmp a b = compare (fst a) (fst b)
 
 type CWriterM = StateT Int (WriterT [String] (ReaderT CWriterEnv CompileM))
 data CWriterEnv = CWriterEnv { entrypoints :: M.Map KId Label
                              , checkpoints :: M.Map Label Int
                              , strings :: M.Map String String
+                             , spillTags :: [(Int, TagRecord)]
+                             , spillTagRefs :: M.Map KId Int
                              }
+
+data TagRecord = TagRecord { tagSize :: Int } deriving (Eq, Ord)
 
 runCWriterM :: CWriterEnv -> CWriterM a -> CompileM [String]
 runCWriterM env m = runReaderT (execWriterT (evalStateT m 0)) env

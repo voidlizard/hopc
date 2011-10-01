@@ -3,8 +3,8 @@
 
 #include <hopcruntime.h>
 
-hword_t display(hword_t);
-hword_t newline();
-void sleep(hword_t);
+void hopc_ffi__display(hword_t);
+void hopc_ffi__newline();
+void hopc_ffi__sleep(hword_t);
 
 #endif

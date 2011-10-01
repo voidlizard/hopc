@@ -97,6 +97,14 @@ void hopc_pop_activation_record(hopc_runtime *r) {
     }
 }
 
+void hopc_spill(hopc_runtime *r, hword_t slot, hword_t data) {
+  r->taskheadp->arhead->slots[slot] = data;
+}
+
+hword_t hopc_unspill(hopc_runtime *r, hword_t slot) {
+  return r->taskheadp->arhead->slots[slot];
+}
+
 void hopc_gc_update_chunk_pointers(hopc_runtime *r, hword_t* lb, hword_t shift, hword_t size, hword_t *raw, const unsigned char *mask) {
     while(--size) {
         if( BITGET(mask, size) ) {

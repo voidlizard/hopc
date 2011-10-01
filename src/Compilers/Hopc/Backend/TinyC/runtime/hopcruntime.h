@@ -53,7 +53,7 @@ typedef struct {
     const hopc_tagdata *tagdata;
 } hopc_runtime;
 
-#define HOPC_CALLFFI(n, args...) n(args)
+#define HOPC_CALLFFI(n, args...) hopc_ffi__##n(args)
 
 void hopc_init_runtime(hopc_runtime *, hword_t *mem, hword_t size);
 
@@ -81,6 +81,9 @@ void hopc_delete_task(hopc_runtime*, hword_t);
 
 hopc_ar *hopc_push_activation_record(hopc_runtime*, htag);
 void hopc_pop_activation_record(hopc_runtime*);
+
+void hopc_spill(hopc_runtime*, hword_t, hword_t);
+hword_t hopc_unspill(hopc_runtime*, hword_t);
 
 void hopc_out_of_mem_hook(hopc_runtime*);
 

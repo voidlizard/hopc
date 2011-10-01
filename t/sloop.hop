@@ -3,7 +3,10 @@
 ($ foreign "newline" newline ((:unit) :unit)   $)
 ($ foreign "sleep"   sleep   ((:int) :unit )  $)
 
-(define (pysh s) (display s))
+(define (pysh s)
+    (display s)
+    (newline)
+)
 
 ($ typeof main ((:unit) :unit) $)
 
