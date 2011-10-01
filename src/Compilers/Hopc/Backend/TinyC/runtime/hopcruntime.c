@@ -333,7 +333,7 @@ void hopc_gc_mark_roots(hopc_runtime* r) {
     for(; p; p = p->next ) {
         chunk = hopc_get_task_chunk(r, p);
         printf("FOUND TASK CHUNK: 0x%08X 0x%08X\n", p, chunk);
-/*        hopc_gc_mark_activation_record(r, p->arhead);*/
+        hopc_gc_mark_activation_record(r, p->arhead);
         hopc_gc_mark_root_alive(r, chunk);
         hopc_gc_mark_chunk_pointers(r, HOPCREGNUM, p->regs, p->mask);
     }
