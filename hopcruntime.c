@@ -1,2 +1,0 @@
-#include <hopcruntime.h>
-
