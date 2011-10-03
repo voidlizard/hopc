@@ -28,16 +28,20 @@ import Debug.Trace
 
 write :: KId -> [Proc] -> CompileM [String]
 write ep p = do
-      (tl, tref) <- uniqSpillTagMap 1
+      (tl, tref) <- uniqSpillTagMap (closureTag+1)
       runCWriterM (envInit tl tref) $ do
         prologue
         entrypoint $ forM_ p $ \p -> do
           comment (name p)
+          comment $ printf "arity: %d  freevars: %d" (arity p) (freevarsnum p)
           forM_ (body p) (opcode p)
           empty
         epilogue
 
   where
+
+    closureTag = 1
+
     prologue :: CWriterM ()
     prologue = do
 
@@ -45,6 +49,8 @@ write ep p = do
       indent "#include \"hopcstubs.h\""
 
       empty
+
+      indent $ printf "#define HOPCCLOSURETAG %d" (closureTag)
 
       comment "FIXME: more general way to allocate the heap"
       indent $ "#define HOPCINITIALHEAPSIZE 8192 // words"
@@ -66,6 +72,7 @@ write ep p = do
 
       indent $ "const hopc_tagdata tagdata[] = {"
       shift $ " {WORDS(sizeof(hopc_task)), {0}}"
+      shift $ ",{WORDS(sizeof(hopc_closure)), {0}} // HOPCCLOSURETAG " 
 
       -- insert spill's tags
       tl <- asks spillTags
@@ -204,6 +211,17 @@ write ep p = do
     activationRecord p | (slotnum p) > 0 = do
       tag <- asks (fromJust . M.lookup (name p) . spillTagRefs)
       shift $ stmt $ printf "hopc_push_activation_record(runtime, %d)" tag
+      let alloc = fromJust $ M.lookup (name p) funAllocMap
+      let spl = M.fromList $
+                  map varname $
+                    maybe [] S.toList $ M.lookup (V.entrypoint p) (spill alloc)
+      let av = M.lookup activationRecordVariable spl
+      case av of
+        Nothing -> nothing
+        Just (k,r) -> -- spill R0 first if it must be spilled
+          shift $ printf "hopc_spill(runtime, %d, %s);  /* %s */" k (reg r) activationRecordVariable
+      empty
+      where varname (n, r, k) = (n,(k,r))
 
     activationRecord _ = nothing
 
@@ -215,8 +233,9 @@ write ep p = do
 
     opcode :: Proc -> Op -> CWriterM ()
     opcode p (Label n) = do
-      gotoLabel (show n) >> caseLabel n
-      when (n == V.entrypoint p) $ activationRecord p 
+      gotoLabel (show n)
+      when (n == V.entrypoint p) $ activationRecord p
+      caseLabel n
 
     opcode _ (Branch n) = branch n
 
@@ -234,7 +253,7 @@ write ep p = do
 
     opcode _ (Const (LStr s) r) = do
       sname <- asks (fromJust . M.lookup s . strings) -- FIXME: must mork
-      shift $ stmt $ reg r ++ " = (hword_t*)" ++ sname
+      shift $ stmt $ printf "%s = W((hword_t*)%s)" (reg r) sname
 
     opcode _ (Move r1 r2) = shift $ stmt $ reg r2 ++ " = " ++ reg r1
 
@@ -249,17 +268,26 @@ write ep p = do
       empty
 
     opcode _ (CallF _ n  rs r) = do
---      shiftIndent $ comment $ "foreign call " ++ n 
+      shiftIndent $ comment $ "foreign call " ++ n 
       foreign n r rs
+
+    opcode _ (CallC l rc rs _) = do
+      let cl = decorateCaseLbl (show l)
+      shiftIndent $ comment $ "closure call " ++ (reg rc)
+      shiftIndent $ comment "critical section?"
+      shift $ stmt $ printf "hopc_push_activation_record2(runtime, HOPC_CLOSURE_UNPACK_AR(runtime, P(%s)))" (reg rc)
+      shift $ stmt $ printf "hopc_spill(runtime, 0, %s)" cl -- FIXME: hardcode of activationRecordVariable slot
+      shift $ stmt $ printf "R0 = HOPC_CLOSURE_UNPACK_CHECKPOINT(runtime, P(%s))" (reg rc)
+      when (not (null rs)) $
+        shift $ printf "LOCALCALLARGS%d(%s)" (length rs) (intercalate "," (map reg rs))
+      shift $ goto' entrypointLabel
       empty
 
-    opcode _ (CallC _ r _ _) = do
-      shiftIndent $ comment $ "closure call " ++ reg r
-      empty
-
-    opcode _ (Spill r n) = do
+    opcode _ (Spill v r n) = do    
 --      shiftIndent $ comment $ "spill " ++ reg r ++ " " ++ show n
-      shift $ stmt $ printf "hopc_spill(runtime, %d, %s)" n (reg r)
+      if v /= activationRecordVariable
+        then shift $ printf "hopc_spill(runtime, %d, %s);  /* %s */" n (reg r) v
+        else nothing -- R0 is spilled in prologue
 
     opcode _ (Unspill n r) = do
 --      shiftIndent $ comment $ "unspill " ++ reg r ++ " " ++ show n
@@ -270,6 +298,23 @@ write ep p = do
 
     opcode _ (BranchFalse r l) = do
       shift $ stmt $ printf "if(!(%s)) %s" (reg r) (goto l)
+
+    opcode p (MkClos n rs rt) = do
+      lself <- funEntry (name p)
+      l <- funEntry n
+      let alloc = maybe S.empty id $ M.lookup l $ spill $ fromJust $ M.lookup n funAllocMap -- FIXME: must work but ugly
+      let slots = M.fromList $ map (\(n,_,sn) -> (n,sn))$ S.toList $ alloc
+--      let fv = slots `M.intersection` (M.fromList $ (map (\a -> (a,a))) $ funFreeVars n)
+      let fv = catMaybes $ map (flip M.lookup slots) $ funFreeVars n
+      let spl = zip rs fv
+      when (length spl /= (length.funFreeVars) n) $ error "INTERNAL ERROR / COMPILER ERROR: make-closure free vars mismatched"  -- FIXME
+      tag <- asks (fromJust . M.lookup n . spillTagRefs)
+      shift $ stmt $ printf "%s = W(hopc_make_activation_record(runtime, %d))" (reg rt) tag
+      forM_ spl $ \(r,i) -> do
+        shift $ stmt $ printf "hopc_spill_ar(runtime, P(%s), %d, %s)" (reg rt) i (reg r)
+      let cl = decorateCaseLbl (show l)
+      shift $ stmt $ printf "%s = W(hopc_make_closure(runtime, %s, P(%s), HOPCCLOSURETAG))" (reg rt) cl (reg rt)
+      empty
 
     opcode _ x = shiftIndent $ comment $ show x
 
@@ -291,9 +336,23 @@ write ep p = do
     sencode s = "{" ++ enc ++ "}"
       where enc = intercalate "," $ map (printf "0x%02X") $ length s : map ord s ++ [0]
 
+    funMap :: M.Map KId Proc
+    funMap = M.fromList $ map (\(fp@(Proc{name=n})) -> (n,fp)) p
+
+    funFreeVars :: KId -> [KId]
+    funFreeVars n = fv (fromJust (M.lookup n funMap))
+      where fv (Proc{freevarsnum=fvn, args=as}) | fvn > 0 = drop (length as - fvn) as
+                                                | otherwise = []
+
+    funAllocMap :: M.Map KId RegAllocation
+    funAllocMap = M.fromList $ map (\(Proc{name=n, allocation=a})  -> (n,a)) p
+
     funEntry :: KId -> CWriterM Label
     funEntry n =
       asks (M.lookup n.entrypoints) >>= return.fromJust --- FIXME: must always work. but code is dirty
+
+    funVars :: KId -> [KId]
+    funVars = undefined
 
     entrypointsMap =
       M.fromList $ map (\p@(Proc{name=fn, entrypoint=l}) -> (fn, l)) p

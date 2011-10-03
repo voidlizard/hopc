@@ -32,9 +32,9 @@ data Op  =   Label Label
            | MkClos KId [R] R
            | Const Lit R
            | Move  R R
-           | Spill   R Slot
+           | Spill KId R Slot
            | Unspill Slot R
-           | Branch Label 
+           | Branch Label
            | BranchFalse R Label
            | BranchTrue  R Label
            | Nop
@@ -42,9 +42,12 @@ data Op  =   Label Label
 
 data Proc = Proc { name :: KId
                  , arity :: Int
+                 , args :: [KId]
                  , slotnum :: Int
+                 , freevarsnum :: Int
                  , body :: [Op]
                  , entrypoint :: Label
+                 , allocation :: RegAllocation
                  }
             deriving (Show)
 
@@ -57,7 +60,7 @@ instance Show (Op) where
   show (Const (LInt n) r) = ind $ "iconst " ++ (show n) ++ " " ++ (show r)
   show (Const (LStr s) r) = ind $ "sconst " ++ (show s) ++ " " ++ (show r)
   show (Move a b)         = ind $ "move " ++ (show a) ++ " " ++ (show b)
-  show (Spill r n)        = ind $ "spill " ++ (show r) ++ " " ++ (show n)
+  show (Spill _ r n)      = ind $ "spill " ++ (show r) ++ " " ++ (show n)
   show (Unspill n r)      = ind $ "unspill " ++ (show n) ++ " " ++ (show r)
   show (Branch l)         = ind $ "branch " ++  " " ++ (show l)
   show (BranchTrue r l1)  = ind $ "branch-true "   ++ (show r) ++ " " ++ (show l1)
@@ -77,5 +80,5 @@ data RegAllocation = RegAllocation { alloc :: M.Map Label (M.Map KId R)
                                    , spill :: M.Map Label (S.Set (KId, R, Int))
                                    , free  :: M.Map Label [R]
                                    , slots :: Int
-                                   }
+                                   } deriving Show
 

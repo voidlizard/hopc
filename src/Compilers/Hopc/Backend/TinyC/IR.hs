@@ -33,7 +33,7 @@ instance NonLocal Insn where
 --    successors (Assign _ _)   = []
 
 
-data Proc = Proc { name :: KId, args :: [KId], entry :: Label, body :: Graph Insn C C }
+data Proc = Proc { name :: KId, args :: [KId], freevarsnum :: Int, entry :: Label, body :: Graph Insn C C }
 
 instance Show (Insn e x) where
   show (Label lbl)      = show lbl ++ ":"

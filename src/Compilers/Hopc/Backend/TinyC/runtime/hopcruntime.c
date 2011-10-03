@@ -29,10 +29,6 @@ void hopc_init_runtime(hopc_runtime *runtime, hword_t *mem, hword_t size) {
 hopc_task *hopc_insert_task(hopc_runtime *runtime) {
     hword_t *chunk = hopc_gc_alloc_chunk(runtime, HOPCTASKTAG);
     hopc_task *t = 0;
-    if( !chunk ) {
-        hopc_out_of_mem_hook(runtime);
-        return 0; // FIXME: out of mem
-    }
     ((memchunk*)chunk)->t.gc_follow = 0;
     t = (hopc_task*)hopc_gc_chunk_start(runtime, chunk);
     t->id = runtime->taskid++;
@@ -50,7 +46,7 @@ hopc_task *hopc_find_task(hopc_runtime *runtime, hword_t id) {
     hopc_task *p = runtime->taskheadp;
     for(; p && p->id != id; p = p->next );
     if( p && p->id == id ) return p;
-    return 1;
+    return 0;
 }
 
 hword_t *hopc_get_task_chunk(hopc_runtime *r, hopc_task *t) {
@@ -72,17 +68,19 @@ void hopc_delete_task(hopc_runtime *runtime, hword_t id) {
     }
 }
 
-hopc_ar *hopc_push_activation_record(hopc_runtime *runtime, htag tag) {
+hword_t *hopc_make_activation_record(hopc_runtime *runtime, htag tag) {
     hword_t *chunk = hopc_gc_alloc_chunk(runtime, tag);
     hopc_ar *arp = 0;
-    if( !chunk ) {
-        hopc_out_of_mem_hook(runtime);
-        return 0;
-    }
+/*    printf("hopc_make_activation_record\n");*/
     arp = (hopc_ar*)hopc_gc_chunk_start(runtime, chunk);
     arp->size = hopc_tagsize(runtime, tag);
     memset(arp->slots, 0, sizeof(hword_t)*(arp->size-2));
-    ((memchunk*)chunk)->t.gc_follow = 0;
+    ((memchunk*)chunk)->t.gc_follow = 1;
+    return chunk;
+}
+
+hopc_ar *hopc_push_activation_record2(hopc_runtime *runtime, hword_t *chunk) {
+    hopc_ar *arp = (hopc_ar*)hopc_gc_chunk_start(runtime, chunk);
     if( runtime->taskheadp ) {
         arp->next = runtime->taskheadp->arhead;
         runtime->taskheadp->arhead = arp;
@@ -90,11 +88,31 @@ hopc_ar *hopc_push_activation_record(hopc_runtime *runtime, htag tag) {
     return arp;
 }
 
+hopc_ar *hopc_push_activation_record(hopc_runtime *runtime, htag tag) {
+    hword_t *chunk = hopc_make_activation_record(runtime, tag);
+    return hopc_push_activation_record2(runtime, chunk);
+}
+
 void hopc_pop_activation_record(hopc_runtime *r) {
     hopc_ar *arp = r->taskheadp ? r->taskheadp->arhead : 0;
     if( arp ) {
         r->taskheadp->arhead = arp->next;
     }
+}
+
+void hopc_spill_ar(hopc_runtime *r, hword_t *chunk, hword_t slot, hword_t data) {
+  hopc_ar *arp = (hopc_ar*)hopc_gc_chunk_start(r, chunk);
+  arp->slots[slot] = data;
+}
+
+hword_t *hopc_make_closure(hopc_runtime *runtime, hword_t label, hword_t *archunk, htag tag) {
+    hword_t *chunk = hopc_gc_alloc_chunk(runtime, tag);
+    hopc_closure *closp = (hopc_closure*)hopc_gc_chunk_start(runtime, chunk);
+/*    printf("make closure: %d %08X\n", label, archunk );*/
+    closp->cp = label;
+    closp->ar = archunk;
+/*    printf("make closure cp: %d %08X t:%04X t1:%04X %08X / ar %08X\n", closp->cp, closp, tag, ((memchunk*)chunk)->t.tag, chunk, closp->ar);*/
+    return chunk;
 }
 
 void hopc_spill(hopc_runtime *r, hword_t slot, hword_t data) {
@@ -163,6 +181,7 @@ hword_t *hopc_gc_alloc_chunk(hopc_runtime *runtime, htag tag) {
 /*        printf("allocated: %08X %d %d %04X\n", (hword_t*)chunk, size, hopc_tagsize(runtime, tag), tag);*/
         return (hword_t*)chunk;
     }
+    hopc_out_of_mem_hook(runtime);
     return (hword_t*)0;
 }
 

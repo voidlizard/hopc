@@ -103,7 +103,7 @@ conv2 k' = do
 
     let nr n = M.lookup n rl'
 --    let fss n = maybe [] id (f2 n)
-    let ct = rewriteBi (rself nr f2) cl'
+    let ct = rewriteBi (rself flt nr f2) cl'
 
     (cl'', s) <- runStateT (rewriteBiM (r (C3 f2 g fb2 rn flt)) ct) (M.empty)
 
@@ -160,9 +160,9 @@ conv2 k' = do
           clos n = do
             fv <- gets (M.lookup n . cfree)
             case fv of
-                Nothing -> return $ CMakeCls n Nothing 
-                Just [] -> return $ CMakeCls n Nothing 
-                Just x  -> return $ CMakeCls n (Just x) 
+                Nothing -> return $ CMakeCls n Nothing
+                Just [] -> return $ CMakeCls n Nothing
+                Just x  -> return $ CMakeCls n (Just x)
 
           fl (KLambda _ _) r = [] 
           fl (KVar n )     r = concat r ++ [Right n]
@@ -181,15 +181,17 @@ conv2 k' = do
 
           r :: C3 -> Closure -> C4M (Maybe Closure)
 
-          r c (CApplCls n args) | ((isglob c) n) =
-            return $ Just $ CApplDir n args
+          r c (CApplCls n args) | ((isglob c) n) = do
+            let args' = (fv2 c) n args
+            return $ Just $ CApplDir n args'
  
           r c (CApplCls n args) | (not.(isglob c)) n = do
+            let args' = (fv2 c) n args
             let nm = ((rn c) n)
             let b = ((fbind c) nm)
             case b of
                 Nothing -> return Nothing
-                (Just (Fun n _ [] _)) -> return $ Just $ CApplDir ((rn c) n) args
+                (Just (Fun n _ [] _)) -> return $ Just $ CApplDir ((rn c) n) args'
                 (Just (Fun n _ xs _)) -> return Nothing
 
           r c (CMakeCls n Nothing) = return $ Just $ CMakeCls ((rn c) n) (Just ((fv c) n))
@@ -201,7 +203,11 @@ conv2 k' = do
                 else return $ Just $ CMakeCls n (Just f')
 
           r c (CFun (Fun fn a f b)) = do
+--            b <- eliminate b'
             let aset = S.fromList $ alive b
+            
+--            trace ("ALIVE " ++ fn ++ " f:" ++ show f) $ trace (show aset) $ return ()
+
             let f' = filter (flip S.member aset) f
 
             if f' == f 
@@ -210,14 +216,14 @@ conv2 k' = do
 
           r c x = return Nothing
 
-          rself :: (KId -> Maybe KId) -> (KId -> [KId]) -> Closure -> Maybe Closure
-          rself nr fv (CApplCls n args) =
+          rself :: (KId -> [KId] -> [KId]) -> (KId -> Maybe KId) -> (KId -> [KId]) -> Closure -> Maybe Closure
+          rself flt nr fv (CApplCls n args) =
             let nm = nr (fname n)
             in case nm of
-                Just x | x == n -> Just $ CApplDir (fname n) $ args ++ (fv (fname n))
+                Just x | x == n -> Just $ CApplDir (fname n) $ args ++ (flt n (fv (fname n)))
                 _ -> Nothing
 
-          rself _ _ _ = Nothing
+          rself _ _ _ _ = Nothing
 
           alive c = para a c
 
@@ -305,6 +311,7 @@ eliminate k = do
           u (CMakeCls n (Just args)) r = concat r ++ n:args
           u (CMakeCls n Nothing) r = n:concat r
           u (CCond n _ _) r = concat r ++ [n]
+--          u (CFun (Fun n _ _ _)) r = trace ("oops! got CFun " ++ n ++ show r) $ concat r
           u x r = concat r
 
           init = Elim S.empty

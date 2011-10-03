@@ -47,7 +47,7 @@ import qualified Compilers.Hopc.Backend.TinyC.VM as V
 import qualified Compilers.Hopc.Backend.TinyC.CWriter as W
 
 
-data Results = RVm [V.Proc] | RCCode [String]
+data Results = RVm [V.Proc] | RCCode [String] | RClos C.Closure | RKTree KTree | RAlloc V.RegAllocation
 
 runM :: M a -> a
 runM m = runSimpleUniqueMonad $ runWithFuel 0 m
@@ -65,18 +65,25 @@ main = do
           k'' <- return k'  >>= Cn.propagate
                             >>= B.betaReduceM
                             >>= L.flattenM
-          c1 <- C.conv2 k'' >>= E.eliminate
+--          c1 <- C.conv2 k'' >>= E.eliminate
+          c1' <- C.conv2 k''
+          c1 <- E.eliminate c1'
+
           procs <- FC.convert c1
           dict <- getEntries
           ep <- getEntryPoint >>= return.fromJust
           vm <- forM procs $ \p@(I.Proc {I.name = n, I.body = g, I.entry = e}) -> do
                   live <- lift $ L.live e g
                   let asap = spillASAP dict live p
+--                  trace ("SPILL ASAP " ++ n) $ trace ((show asap) ++ ";") $ return ()
                   alloc <- lift $ R.allocateLinearScan dict live asap p
+--                  trace ("Reg. Allocation " ++ n) $ trace (show (V.alloc alloc)) $ return ()
+--                  trace ("Spilled " ++ n) $ trace (show (V.spill alloc)) $ return ()
                   lift $ fromIR dict live alloc p
           code <- W.write ep vm
-          return $ RCCode code
---          return $ RVm vm
+          return $ [RCCode code]
+--          return $ [RKTree k'', RClos c1, RVm vm, RCCode code]
+--          return $ RClos c1
         return st
 
 input "-" fn = BS.hGetContents stdin >>= fn
@@ -87,26 +94,42 @@ dumpConstraints (Left _) = error "Type infer error"
 
 dump x = liftIO $ putStrLn (prettyShow x) >> return x
 
-dumpResult :: Either CompileError (Results, CompileState) -> IO ()
+dumpResult :: Either CompileError ([Results], CompileState) -> IO ()
 
-dumpResult (Right ((RVm p), _)) =
+dumpResult (Right (x, _)) = forM_ x dumpResult'
+dumpResult (Left x) = print x
+
+dumpResult' (RVm p) =
   forM_ p $ \(V.Proc {V.name = n, V.arity = arity, V.slotnum = sn, V.body = body}) -> do
     putStrLn ""
     putStrLn (printf "%s (%d) slotnum:%d" n arity sn)
     putStrLn $ intercalate "\n" $ map show body
 
-dumpResult (Right ((RCCode c), _)) = do
+dumpResult' (RAlloc a) = do
+  putStrLn "Register allocation"
+
+dumpResult' (RCCode c) = do
   putStrLn ""
   putStrLn $ intercalate "\n" c
   putStrLn ""
+
+dumpResult' (RClos c) = do
+  putStrLn ""
+  putStrLn $ prettyShow c
+  putStrLn ""
+
+dumpResult' (RKTree k) = do
+  putStrLn ""
+  putStrLn $ prettyShow k
+  putStrLn ""
+
 --  forM_ p $ \(V.Proc {V.name = n, V.arity = arity, V.slotnum = sn, V.body = body}) -> do
 --    putStrLn ""
 --    putStrLn (printf "%s (%d) slotnum:%d" n arity sn)
 --    putStrLn $ intercalate "\n" $ map show body
 
 
-dumpResult (Right _) = error "Got some positive results but don't know what to do with them"
-dumpResult (Left x) = print x
+--dumpResult (Right _) = error "Got some positive results but don't know what to do with them"
 
 reportStatus (Left x)  = print x
 reportStatus (Right x) = error "finished?"

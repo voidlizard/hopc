@@ -5,6 +5,7 @@ module Compilers.Hopc.Backend.TinyC.VM (
     module Compilers.Hopc.Backend.TinyC.VM.Types
   , fromIR
   , spillASAP
+--  , spillFreeVars
   ) where
 
 import Data.List
@@ -31,7 +32,7 @@ import qualified Compilers.Hopc.Backend.TinyC.IR as I
 
 fromIR :: TDict -> FactBase Live -> RegAllocation -> I.Proc -> M Proc
 
-fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}) = do
+fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as, I.freevarsnum=fvn}) = do
   let (GMany _ bbb _) = g
   let blocks = postorder_dfs_from bbb e
 
@@ -43,8 +44,15 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
           liftM (wipeSnots . mergeBlocks e) $
             mapM (\b -> foldBlockNodesF (liftVM trNode) b emptyM) blocks
 
-  return $ Proc {name = n, arity = length as, slotnum = (rsSlotMax st), body = vm, entrypoint = e}
-
+  return $ Proc { name = n
+                , arity = length as
+                , args = as
+                , slotnum = (rsSlotMax st)
+                , body = vm
+                , entrypoint = e
+                , freevarsnum = (I.freevarsnum p)
+                , allocation = ra
+                }
   where
 
     trNode :: forall e x. Insn e x -> TrM TOp
@@ -95,7 +103,11 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
       unsp <- unspill activationRecordVariable (Just closureReg)
       chunkM $ unsp ++ [Return] 
 
-    trNode (I.MkClos _ _ _) = error "CLOSURES ARE NOT SUPPORTED YET" -- FIXME
+    trNode (I.MkClos fn args var) = do
+      uns <- mapM (\x -> unspill x Nothing) args >>= return . concat
+      rs <- mapM reg args
+      rt <- reg var
+      chunkM $ uns ++ [MkClos fn rs rt]
 
     trNode _ = chunkM [Nop]
 
@@ -129,27 +141,43 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
       nl <- gets rsTLabel
       chunkM $ areload ++ [Branch nl]
 
-    callOf call@(I.Call l (I.Direct n False) args r) (TFun TFunLocal _ rt) = do
+--    callOf call@(I.Call l (I.Direct n False) args r) (TFun TFunLocal _ rt) = do
+    callOf call@(I.Call l ct args r) (TFun TFunLocal _ rt) = do
       (spl, s) <- spillAlive l r
---      trace "SPILL ALIVE" $ trace (show spl) $ return () 
-      uns <- mapM (\x -> unspill x Nothing) args >>= return . concat
+--      trace "SPILL ALIVE" $ trace (show spl) $ return ()
+      uns <- mapM (\x -> unspill x Nothing) (callv ct args) >>= return . concat
       rs <- mapM reg args
       lbl <- newLabel
-      call <- callRet rt r (chunkMs . CallL lbl n rs) >>= \x -> chunkM $ spl ++ uns ++ x
+      callfun <- callF ct lbl rs
+      call <- callRet rt r (chunkMs . callfun) >>= \x -> chunkM $ spl ++ uns ++ x
       unsp <- mapM (\(n,r) -> unspill n (Just r)) s >>= return . concat
       mapM_ delSpill (map fst s)
       retR <- reg r
 --      trace "CALL OF" $ trace (show n) $ trace (show rt) $ return ()
       chunkM $ call ++ [Label lbl] ++ movRet rt retR ++ unsp ++ [Branch l]
---      chunkM $ call ++ chunk -- ++ movRet rt retR ++ unsp
+      where callF (I.Direct n _)  lbl rs = return $ CallL lbl n rs
+            callF (I.Closure n _) lbl rs = do
+              r <- reg n
+              return $ CallC lbl r rs
+
+            callv (I.Direct n _)  as = as
+            callv (I.Closure n _) as = n:as
 
     callOf (I.Call l (I.Direct n _) args r) (TFun (TFunForeign nm) _ rt) = do
       uns <- mapM (\x -> unspill x Nothing) args >>= return . concat
       rs <- mapM reg args
       callRet rt r (chunkMs . CallF l nm rs) >>= \x -> chunkM $ uns ++ x
 
-    callOf _ _ = error "Unsupported call type" -- FIXME ASAP
-      
+    callOf (I.Call l (I.Closure n _) args r) (TFun TFunLocal atypes rt) = do
+        chunkM [Nop]
+--      error "Local closure call" -- FIXME ASAP
+
+    callOf (I.Call l (I.Closure n _) args r) (TFun (TFunForeign _) _ rt) = do 
+      error "Foreign closure call" -- FIXME ASAP
+
+    callOf _ _ = do
+      error "Unsupported call type"
+
     movRet :: HType -> R -> [Op]
     movRet TUnit r = []
     movRet _ r = [Move R1 r]
@@ -168,18 +196,21 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
       case M.lookup n sp of
         Nothing -> emptyM
         Just spills -> mapM spillOf (S.toList spills) >>= return.concat
+--      where nonFree s (Spill ) = not $ S.member n s
 
     spillOf  :: (KId, R, Int) -> TrM TOp
     spillOf (n,r,s) = do
 --      trace ("SPILL VAR " ++ show (n,r)) $ return ()
       i <- gets rsSlot
       spilled <- gets (M.member n . rsSpill)
-      if spilled 
+
+      if spilled
         then emptyM
-        else do let sp = Spill r i
+        else do let sp = Spill n r i
                 succSlot
                 modify(\s -> s{rsFree=r:rsFree s, rsSpill = M.insert n i (rsSpill s)})
-                chunkMs sp
+                -- free vars must be spilled before closure call (outside the closure)
+                if (not (S.member n fvs)) then chunkMs sp else emptyM
 
     spillReg :: TrM TOp
     spillReg = do
@@ -230,6 +261,8 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
 
     unspill' Nothing _ = emptyM
 
+    fvs = S.fromList $ freevars fvn as
+
     succSlot :: TrM ()
     succSlot = do
       slot <- gets rsSlot >>= return . succ
@@ -246,11 +279,14 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
       free' <- gets rsFree
       ma' <- gets rsAlloc
       let ma = maybe M.empty id ra
+      let rsAlloc' = ma' `M.union` ma
 --      trace ("LABEL " ++ show l) $ trace ("FREE REGS ") $ trace (show rf) $ trace "<<<" $
       modify (\st -> st { rsMerge = mergeOp
                         , rsLabel = l
-                        , rsAlloc = ma' `M.union` ma
-                        , rsFree = (maybe free' id rf)})
+                        , rsAlloc = rsAlloc'
+                        , rsFree = (maybe free' id rf)
+                        , rsAllocTrack = M.insert l rsAlloc' (rsAllocTrack st)
+                        })
 
     reg :: KId -> TrM R
     reg n = do
@@ -280,7 +316,7 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
     initR = REnv ra dict live
 
     initS :: Label -> REnvSt
-    initS l = REnvSt e M.empty M.empty [] 0 0 mergeOp l 
+    initS l = REnvSt e M.empty M.empty [] 0 0 mergeOp l M.empty 
 
     mergeOp :: TOp -> TOp -> TOp
     mergeOp x y = x ++ y
@@ -382,8 +418,16 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as}
 --    printN x = do
 --        trace (printf "%-60s ;" (show x)) $ return ()
 
+
+--isFreeVar :: KId -> Proc -> Bool
+--isFreeVar n (Proc{args=as, freevarsnum=fvn}) = undefined 
+
+freevars :: Int -> [KId] -> [KId]
+freevars n as | n > 0  = drop (length as - n) as
+              | otherwise = []
+
 spillASAP :: TDict -> FactBase Live -> I.Proc -> S.Set KId 
-spillASAP dict live (I.Proc{I.body=g, I.args=as}) = ofProc $ foldGraphNodes node g S.empty
+spillASAP dict live (I.Proc{I.body=g, I.args=as, I.freevarsnum=fvn}) = ofProc $ foldGraphNodes node g S.empty
   where 
     node :: forall e x . Insn e x -> S.Set KId -> S.Set KId 
     node (I.Call l ct _ _ ) acc = varsOf l (varType (callvar ct) dict) `S.union` acc
@@ -394,9 +438,15 @@ spillASAP dict live (I.Proc{I.body=g, I.args=as}) = ofProc $ foldGraphNodes node
     varsOf l _ = S.empty
 
     ofProc :: S.Set KId -> S.Set KId
-    ofProc asap = spills `S.intersection` asap 
+--    ofProc asap = arv `S.union` fvs `S.union` (spills `S.intersection` asap)
+    ofProc asap = spills `S.intersection` ( arv `S.union` fvs `S.union` asap )
 
     spills = S.fromList $ activationRecordVariable:as
+
+    fvs = S.fromList $ freevars fvn as
+
+    arv | fvn > 0 = S.singleton activationRecordVariable
+        | otherwise = S.empty
 
 varType :: KId -> TDict -> HType 
 varType n rdict =
@@ -422,6 +472,7 @@ data REnvSt  = REnvSt { rsLabel :: Label
                       , rsSlotMax :: Int
                       , rsMerge :: TOp -> TOp -> TOp
                       , rsTLabel :: Label
+                      , rsAllocTrack :: M.Map Label (M.Map KId R)
                       }
 
 type TrM = StateT REnvSt (ReaderT REnv M)

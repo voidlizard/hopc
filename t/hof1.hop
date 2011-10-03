@@ -1,0 +1,7 @@
+($ foreign "display" display ((:string) :unit) $)
+
+(define (func1 a) (a "QQQ"))
+(define (func2 s) (display s))
+
+(func1 func2)
+

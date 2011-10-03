@@ -18,6 +18,11 @@ typedef unsigned  htag;
 
 #define WORDS(m) (m/sizeof(hword_t))
 
+#define P(x) ((hword_t*)(x))
+
+#define W(x) ((hword_t)(x))
+
+
 typedef struct __hopctagdata {
     hword_t size;
     unsigned char pmask[HOPCMAXRECORDFIELDS/8];
@@ -26,8 +31,8 @@ typedef struct __hopctagdata {
 typedef struct __hopgc {
 	hword_t *heapstart_p;
 	hword_t *heapend_p;
-    hword_t *top;
-    hword_t *gcbottom;
+  hword_t *top;
+  hword_t *gcbottom;
 } hopc_gc;
 
 typedef struct __ar {
@@ -35,6 +40,14 @@ typedef struct __ar {
     struct __ar *next;
     hword_t slots[1];
 } hopc_ar;
+
+typedef struct __closure {
+  hword_t  cp;
+  hword_t *ar;
+} hopc_closure;
+
+#define HOPC_CLOSURE_UNPACK_AR(r, x)  (((hopc_closure*)(hopc_gc_chunk_start((r), (x))))->ar)  //W(hopc_gc_chunk_start((r), (((hopc_closure*)(hopc_gc_chunk_start((r), (x))))->ar)))
+#define HOPC_CLOSURE_UNPACK_CHECKPOINT(r, x) (((hopc_closure*)(hopc_gc_chunk_start((r), (x))))->cp)
 
 #define HOPCTASKMASKSIZE BITVECTSIZE(HOPCREGNUM)
 
@@ -79,11 +92,17 @@ void hopc_gc_collect(hopc_runtime*);
 hopc_task *hopc_insert_task(hopc_runtime*);
 void hopc_delete_task(hopc_runtime*, hword_t);
 
+hword_t *hopc_make_activation_record(hopc_runtime*, htag); // returns a chunk!
+
 hopc_ar *hopc_push_activation_record(hopc_runtime*, htag);
+//hopc_ar *hopc_push_activation_record2(hopc_runtime*, hword_t*);
 void hopc_pop_activation_record(hopc_runtime*);
 
 void hopc_spill(hopc_runtime*, hword_t, hword_t);
+void hopc_spill_ar(hopc_runtime*, hword_t*, hword_t, hword_t);
 hword_t hopc_unspill(hopc_runtime*, hword_t);
+
+hword_t *hopc_make_closure(hopc_runtime*, hword_t, hword_t*, htag);
 
 void hopc_out_of_mem_hook(hopc_runtime*);
 

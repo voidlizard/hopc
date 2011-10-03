@@ -48,7 +48,7 @@ convert k = do
             end    <- newLabel
             (b, g) <- tr retval (mkFirst (Label entry)) emptyClosedGraph b
             let b' = g |*><*| b <*> mkLast (I.Return retval)
-            return $ Proc { name = n, args = a++f, entry = entry, body = b'}
+            return $ Proc { name = n, args = a++f, freevarsnum=length f, entry = entry, body = b'}
 
         proc e x = error $ "NOT A FUNCTION: " ++ (show x) -- FIXME
 

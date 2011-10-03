@@ -221,6 +221,7 @@ allocateLinearScan dict live asap p@(I.Proc {I.entry = e, I.body = g, I.name = n
       useOf (I.Call _ (I.Closure n1 _) _ n) (l, v) = (l, factIns' n l v `M.union` factIns' n1 l v) -- FIXME: also count the args
       useOf (I.Call _ _ _ n) (l, v) = (l, factIns' n l v) -- FIXME: also count the args ?
       useOf (I.Label n) (_, v) = (n, v)
+      useOf (I.MkClos _ _ n) (l,v) = (l, factIns' n l v)
       useOf _ x = x
 
       factIns' :: KId -> Label -> M.Map KId Label -> M.Map KId Label
