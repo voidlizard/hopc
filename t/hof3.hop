@@ -1,0 +1,29 @@
+($ foreign "display" display ((:string) :unit) $)
+
+(define (fa) "A")
+(define (fb) "B")
+
+(define (func1) (let ((s (fa)) (s1 (fb))) 
+  (lambda (x) (let ((z "qqq"))
+     (begin (display s)
+            (display (fa))
+            (display (fb))
+            (display s1)
+            (display z)
+            (display x)
+            )))))
+
+($ typeof main ((:unit) :unit) $)
+
+(define (main) 
+
+  ((func1) "C")
+  (display "\n")
+  ((func1) "E")
+  (display "\nEND\n")
+  (main)
+
+)
+
+(main)
+

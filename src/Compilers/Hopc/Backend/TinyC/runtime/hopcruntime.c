@@ -367,6 +367,7 @@ void hopc_gc_collect(hopc_runtime* r) {
 
 
 void hopc_out_of_mem_hook(hopc_runtime *r) {
+    printf("*** OUT OF MEMORY");
     exit(-1); // FIXME
 }
 
