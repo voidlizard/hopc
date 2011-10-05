@@ -78,6 +78,9 @@ getConstraints = do
 entryList :: CompileM [(KId,Entry)]
 entryList = gets (M.toList.cdict)
 
+delClosures :: CompileM ()
+delClosures = modify (\s -> s{cclosures = S.empty})
+
 addClosure :: KId -> CompileM ()
 addClosure n = modify (\s -> s{cclosures = S.insert n (cclosures s)})
 

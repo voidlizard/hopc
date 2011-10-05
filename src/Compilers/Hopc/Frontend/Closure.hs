@@ -1,5 +1,5 @@
 {-# LANGUAGE EmptyDataDecls, DeriveDataTypeable #-}
-module Compilers.Hopc.Frontend.Closure (Closure(..), Fun(..), eliminate, conv2)
+module Compilers.Hopc.Frontend.Closure (Closure(..), Fun(..), eliminate, conv2, updateClosures)
                                         where
 
 import qualified Data.Map as M
@@ -132,9 +132,7 @@ conv2 k' = do
 
         addEntry False fn nf
 
-    cfinal <- withWrappers cl''
-    forM_ [n|(CMakeCls n _) <- universe cfinal] $ \n -> addClosure n
-    return cfinal
+    withWrappers cl''
 
     where 
           p :: KTree -> C2M Closure
@@ -296,6 +294,10 @@ instance Pretty Closure where
                                      $$ nest 2 (pPrintPrec l p e)
     pPrintPrec l p (CCond c e1 e2) = prettyParen True $ text "if" <+> text c <+> (pPrintPrec l p e1) <+> (pPrintPrec l p e2)
 
+
+updateClosures :: Closure -> CompileM ()
+updateClosures c =
+  delClosures >> forM_ [n|(CMakeCls n _) <- universe c] addClosure
 
 data Elim = Elim { elenv :: S.Set KId } 
 type ElimM = StateT Elim CompileM

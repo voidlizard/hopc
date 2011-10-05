@@ -67,6 +67,7 @@ main = do
                             >>= L.flattenM
           c1' <- C.conv2 k''
           c1 <- E.eliminate c1'
+          C.updateClosures c1
 
           procs <- FC.convert c1
           dict <- getEntries
@@ -74,6 +75,8 @@ main = do
           vm <- forM procs $ \p@(I.Proc {I.name = n, I.body = g, I.entry = e}) -> do
                   live <- lift $ L.live e g
                   asap <- spillASAP dict live p
+                  clos <- isClosure n
+--                  trace (printf "Proc %s closure: %s" n (show clos)) $ return ()
 --                  trace ("SPILL ASAP " ++ n) $ trace ((show asap) ++ ";") $ return ()
                   alloc <- lift $ R.allocateLinearScan dict live asap p
 --                  trace ("Reg. Allocation " ++ n) $ trace (show (V.alloc alloc)) $ return ()
