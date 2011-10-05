@@ -7,8 +7,15 @@
 
 #include <stdint.h>
 
-typedef unsigned  hword_t;
-typedef unsigned  htag;
+typedef unsigned long hword_t ;
+
+typedef union {
+	hword_t *p;
+	hword_t  w;
+} hcell;
+
+//typedef unsigned  hword_t;
+typedef hword_t htag;
 
 #define HOPCMAXRECORDFIELDS 64 // TODO: remove hardcode
 
@@ -16,12 +23,13 @@ typedef unsigned  htag;
 
 #define HOPCTASKTAG 0
 
-#define WORDS(m) (m/sizeof(hword_t))
+#define CELLS(m) (m/sizeof(hcell))
 
-#define P(x) ((hword_t*)(x))
+#define P(x) ((x).p)
 
-#define W(x) ((hword_t)(x))
+#define W(x) ((x).w)
 
+#define S(x) ((hword_t*)(x))
 
 typedef struct __hopctagdata {
     hword_t size;
@@ -29,32 +37,35 @@ typedef struct __hopctagdata {
 } hopc_tagdata;
 
 typedef struct __hopgc {
-	hword_t *heapstart_p;
-	hword_t *heapend_p;
-  hword_t *top;
-  hword_t *gcbottom;
+    hcell *heapstart_p;
+    hcell *heapend_p;
+    hcell *top;
+    hcell *gcbottom;
 } hopc_gc;
 
 typedef struct __ar {
     hword_t  size; // TODO: remove this somehow
     struct __ar *next;
-    hword_t slots[1];
+    hcell slots[1];
 } hopc_ar;
 
+#define HOPC_AR_HEAD (CELLS(sizeof(hopc_ar)) - CELLS(sizeof(hcell)))
+#define HOPC_AR_SLOTS(ar) (((ar)->size)-HOPC_AR_HEAD)
+
 typedef struct __closure {
-  hword_t  cp;
-  hword_t *ar;
+    hcell cp;
+    hcell ar;
 } hopc_closure;
 
-#define HOPC_CLOSURE_UNPACK_AR(r, x)  (((hopc_closure*)(hopc_gc_chunk_start((r), (x))))->ar)  //W(hopc_gc_chunk_start((r), (((hopc_closure*)(hopc_gc_chunk_start((r), (x))))->ar)))
-#define HOPC_CLOSURE_UNPACK_CHECKPOINT(r, x) (((hopc_closure*)(hopc_gc_chunk_start((r), (x))))->cp)
+#define CLOSURE_AR(r, x) ((memchunk*)((hopc_closure*)hopc_gc_chunk_start(runtime, (hcell*)((x).p)))->ar.p)
+#define CLOSURE_CP(r, x) (((hopc_closure*)hopc_gc_chunk_start(runtime, (hcell*)((x).p)))->cp)
 
 #define HOPCTASKMASKSIZE BITVECTSIZE(HOPCREGNUM)
 
 typedef struct __task {
     struct __task *next;
     hopc_ar *arhead;
-    hword_t regs[HOPCREGNUM];
+    hcell regs[HOPCREGNUM];
     hword_t id;
     unsigned char mask[HOPCTASKMASKSIZE];
 } hopc_task;
@@ -66,46 +77,6 @@ typedef struct {
     const hopc_tagdata *tagdata;
 } hopc_runtime;
 
-#define HOPC_CALLFFI(n, args...) hopc_ffi__##n(args)
-
-void hopc_init_runtime(hopc_runtime *, hword_t *mem, hword_t size);
-
-hword_t hopc_tagsize(hopc_runtime*, htag);
-
-void hopc_gc_init(hopc_gc *gc, hword_t *mem, hword_t size);
-hword_t *hopc_gc_alloc_chunk(hopc_runtime *, htag);
-void hopc_gc_mark_root_alive(hopc_runtime *runtime, hword_t *r);
-hword_t hopc_gc_chunksize(hopc_runtime*, hword_t*);
-hword_t* hopc_gc_prev_chunk(hopc_runtime *r, hword_t *p);
-hword_t hopc_gc_maxmem(hopc_runtime*);
-hword_t hopc_gc_freemem(hopc_runtime*);
-hword_t *hopc_gc_find_live(hopc_runtime*r, hword_t*, hword_t*);
-void hopc_gc_mark_roots(hopc_runtime*);
-void hopc_gc_mark(hopc_runtime*); 
-void hopc_gc_compact(hopc_runtime*);
-hword_t *hopc_gc_chunk_start(hopc_runtime*, hword_t *p);
-hword_t *hopc_gc_calc_shift(hopc_runtime* r, hword_t**, hword_t **);
-hword_t hopc_gc_compact_step(hopc_runtime*);
-void hopc_gc_update_pointers(hopc_runtime*, hword_t*, hword_t);
-void hopc_gc_collect(hopc_runtime*);
-
-hopc_task *hopc_insert_task(hopc_runtime*);
-void hopc_delete_task(hopc_runtime*, hword_t);
-
-hword_t *hopc_make_activation_record(hopc_runtime*, htag); // returns a chunk!
-
-hopc_ar *hopc_push_activation_record(hopc_runtime*, htag);
-//hopc_ar *hopc_push_activation_record2(hopc_runtime*, hword_t*);
-void hopc_pop_activation_record(hopc_runtime*);
-
-void hopc_spill(hopc_runtime*, hword_t, hword_t);
-void hopc_spill_ar(hopc_runtime*, hword_t*, hword_t, hword_t);
-hword_t hopc_unspill(hopc_runtime*, hword_t);
-
-hword_t *hopc_make_closure(hopc_runtime*, hword_t, hword_t*, htag);
-
-void hopc_out_of_mem_hook(hopc_runtime*);
-
 // FIXME: move to hopcruntime.c
 #define TAGBITS ((sizeof(hword_t))*8-2)
 typedef struct __memchunk {
@@ -113,12 +84,44 @@ typedef struct __memchunk {
         struct {
             unsigned gc_alive:1;
             unsigned gc_follow:1;
-            unsigned tag:TAGBITS;
+            hword_t tag:TAGBITS;
         } t; 
-        hword_t _skip[1];
+        hcell cell;
     };
-//    hword_t payload[1];
 } memchunk;
+
+#define HOPC_CALLFFI(n, args...) hopc_ffi__##n(args)
+
+void hopc_init_runtime(hopc_runtime *, hcell *mem, hword_t size);
+void hopc_gc_init(hopc_gc *gc, hcell *mem, hword_t size);
+hcell *hopc_gc_alloc_chunk(hopc_runtime *, htag);
+void hopc_gc_collect(hopc_runtime* r);
+
+hcell *hopc_gc_chunk_start(hopc_runtime *r, hcell *p); 
+
+hword_t hopc_gc_maxmem(hopc_runtime *r); 
+hword_t hopc_gc_freemem(hopc_runtime *r);
+hword_t hopc_gc_chunksize(hopc_runtime *r, memchunk *p);
+
+void hopc_gc_mark_root_alive(hopc_runtime *runtime, memchunk *chunk);
+
+hopc_task *hopc_find_task(hopc_runtime *runtime, hword_t id);
+hopc_task *hopc_insert_task(hopc_runtime *runtime);
+void hopc_delete_task(hopc_runtime *runtime, hword_t id);
+
+hword_t hopc_tagsize(hopc_runtime *r, htag tag); 
+
+memchunk *hopc_make_activation_record(hopc_runtime *runtime, htag tag); 
+hopc_ar *hopc_push_activation_record2(hopc_runtime *runtime, memchunk *chunk);
+hopc_ar *hopc_push_activation_record(hopc_runtime *runtime, htag tag);
+void hopc_pop_activation_record(hopc_runtime *r);
+
+void hopc_spill_ar(hopc_runtime *r, hcell *chunk, hword_t slot, hcell data);
+hcell *hopc_make_closure(hopc_runtime *runtime, hword_t label, hcell *archunk, htag tag);
+void hopc_spill(hopc_runtime *r, hword_t slot, hcell data);
+hcell hopc_unspill(hopc_runtime *r, hword_t slot);
+
+void hopc_out_of_mem_hook(hopc_runtime*);
 
 #define BITGET(t, n) (((t)[(n)/8])&(1<<(n)%8))
 #define HOPC_IS_PTR_TAG(t, n) (BITGET(((t)->pmask), (n)))

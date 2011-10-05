@@ -54,7 +54,7 @@ write ep p = do
 
       comment "FIXME: more general way to allocate the heap"
       indent $ "#define HOPCINITIALHEAPSIZE 8192 // words"
-      indent $ stmt $ "hword_t heap[HOPCINITIALHEAPSIZE] = { 0 }"
+      indent $ stmt $ "hcell heap[HOPCINITIALHEAPSIZE] = { { .w = 0 } }"
 
       empty
       cp <- asks checkpoints
@@ -66,13 +66,13 @@ write ep p = do
       sc <- asks strings 
       forM_ (M.toList sc) $ \(s, n) -> do
         comment $ show s
-        noindent $ stmt $ printf "const unsigned %s[] = %s" n (sencode s)
+        noindent $ stmt $ printf "const hword_t %s[] = %s" n (sencode s)
 
       empty
 
       indent $ "const hopc_tagdata tagdata[] = {"
-      shift $ " {WORDS(sizeof(hopc_task)), {0}}"
-      shift $ ",{WORDS(sizeof(hopc_closure)), {0}} // HOPCCLOSURETAG " 
+      shift $ " {CELLS(sizeof(hopc_task)), {0}}"
+      shift $ ",{CELLS(sizeof(hopc_closure)), {0}} // HOPCCLOSURETAG " 
 
       -- insert spill's tags
       tl <- asks spillTags
@@ -85,7 +85,7 @@ write ep p = do
       indent $ "}"
       indent $ stmt ""
 
-      indent $ stmt "static hword_t localcallregs[HOPCREGNUM] = { 0 }"
+      indent $ stmt "static hcell localcallregs[HOPCREGNUM] = {{ .w = 0 }}"
 
       empty
  
@@ -133,7 +133,7 @@ write ep p = do
       empty
       gotoLabel entrypointLabel
       pushIndent
-      indent $ printf "switch(%s) {" (reg retReg)
+      indent $ printf "switch(W(%s)) {" (reg retReg)
       pushIndent
       m
       gotoLabel exitpointLabel
@@ -166,7 +166,7 @@ write ep p = do
     entrypointLabel = "entrypoint"
     exitpointLabel = "exitpoint"
 
-    regType = "hword_t register"
+    regType = "register hcell"
 
     retReg = R0
 
@@ -175,7 +175,7 @@ write ep p = do
     reg = show
 
     keepReturn :: Label -> CWriterM ()
-    keepReturn l = shift $ stmt $ (reg retReg) ++ " = " ++ decorateCaseLbl (show l)
+    keepReturn l = shift $ stmt $ printf "W(%s) = %s" (reg retReg) (decorateCaseLbl (show l))
 
     goto l = stmt $ "goto " ++ show l
 
@@ -202,7 +202,7 @@ write ep p = do
 
     foreign :: KId -> RT -> [R] -> CWriterM ()
     foreign n (RReg r) rs =
-      shift $ stmt $ printf "%s = HOPC_CALLFFI(%s)" (reg r) (intercalate "," (n:args' rs))
+      shift $ stmt $ printf "W(%s) = HOPC_CALLFFI(%s)" (reg r) (intercalate "," (n:args' rs))
 
     foreign n (RVoid) rs =
       shift $ stmt $ printf "HOPC_CALLFFI(%s)" (intercalate "," (n:args' rs))
@@ -249,11 +249,11 @@ write ep p = do
       shiftIndent $ comment $ "return from " ++ name p
       shift $ goto' entrypointLabel
 
-    opcode _ (Const (LInt v) r) = shift $ stmt $ reg r ++ " = " ++ iconst v
+    opcode _ (Const (LInt v) r) = shift $ stmt $ printf "W(%s) = %s" (reg r) (iconst v)
 
     opcode _ (Const (LStr s) r) = do
       sname <- asks (fromJust . M.lookup s . strings) -- FIXME: must mork
-      shift $ stmt $ printf "%s = W((hword_t*)%s)" (reg r) sname
+      shift $ stmt $ printf "P(%s) = S(%s)" (reg r) sname
 
     opcode _ (Move r1 r2) = shift $ stmt $ reg r2 ++ " = " ++ reg r1
 
@@ -275,9 +275,9 @@ write ep p = do
       let cl = decorateCaseLbl (show l)
       shiftIndent $ comment $ "closure call " ++ (reg rc)
       shiftIndent $ comment "critical section?"
-      shift $ stmt $ printf "hopc_push_activation_record2(runtime, HOPC_CLOSURE_UNPACK_AR(runtime, P(%s)))" (reg rc)
-      shift $ stmt $ printf "hopc_spill(runtime, 0, %s)" cl -- FIXME: hardcode of activationRecordVariable slot
-      shift $ stmt $ printf "R0 = HOPC_CLOSURE_UNPACK_CHECKPOINT(runtime, P(%s))" (reg rc)
+      shift $ stmt $ printf "hopc_push_activation_record2(runtime, CLOSURE_AR(runtime, %s))" (reg rc)
+      shift $ stmt $ printf "hopc_spill(runtime, 0, ((hcell)((hword_t)%s)))" cl -- FIXME: hardcode of activationRecordVariable slot
+      shift $ stmt $ printf "R0 = CLOSURE_CP(runtime, %s)" (reg rc)
       when (not (null rs)) $
         shift $ printf "LOCALCALLARGS%d(%s)" (length rs) (intercalate "," (map reg rs))
       shift $ goto' entrypointLabel
@@ -309,11 +309,11 @@ write ep p = do
       let spl = zip rs fv
       when (length spl /= (length.funFreeVars) n) $ error "INTERNAL ERROR / COMPILER ERROR: make-closure free vars mismatched"  -- FIXME
       tag <- asks (fromJust . M.lookup n . spillTagRefs)
-      shift $ stmt $ printf "%s = W(hopc_make_activation_record(runtime, %d))" (reg rt) tag
+      shift $ stmt $ printf "P(%s) = (hword_t*)hopc_make_activation_record(runtime, %d)" (reg rt) tag
       forM_ spl $ \(r,i) -> do
-        shift $ stmt $ printf "hopc_spill_ar(runtime, P(%s), %d, %s)" (reg rt) i (reg r)
+        shift $ stmt $ printf "hopc_spill_ar(runtime, (hcell*)P(%s), %d, %s)" (reg rt) i (reg r)
       let cl = decorateCaseLbl (show l)
-      shift $ stmt $ printf "%s = W(hopc_make_closure(runtime, %s, P(%s), HOPCCLOSURETAG))" (reg rt) cl (reg rt)
+      shift $ stmt $ printf "P(%s) = (hword_t*)hopc_make_closure(runtime, %s, (hcell*)P(%s), HOPCCLOSURETAG)" (reg rt) cl (reg rt)
       empty
 
     opcode _ x = shiftIndent $ comment $ show x

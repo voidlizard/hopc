@@ -7,13 +7,13 @@
 #include <stdlib.h>
 #include <time.h>
 
-hword_t heap[2*1024];
+hcell heap[1024];
 
 #define ROOTS 63 
 
-void dump_heap(hopc_runtime *r, hword_t num, hword_t **roots);
-void dump_heap2(hopc_runtime *runtime, hword_t num, hword_t **roots);
-void dump_heap3(hopc_runtime *runtime, hword_t num, hword_t **roots);
+/*void dump_heap(hopc_runtime *r, hword_t num, hword_t **roots);*/
+/*void dump_heap2(hopc_runtime *runtime, hword_t num, hword_t **roots);*/
+/*void dump_heap3(hopc_runtime *runtime, hword_t num, hword_t **roots);*/
 
 #define TUPLE1 HOPCTASKTAG
 #define TUPLE2 TUPLE1 + 1
@@ -22,7 +22,7 @@ void dump_heap3(hopc_runtime *runtime, hword_t num, hword_t **roots);
 
 // supposed to be generated automatically
 const hopc_tagdata tagdata[] = {
-     {WORDS(sizeof(hopc_task)), {0}}
+     {CELLS(sizeof(hopc_task)), {0}}
     ,{1, {0}} // 1-tuple
     ,{2, {0}} // 2-tuple
     ,{3, {0}} // 3-tuple
@@ -31,83 +31,93 @@ const hopc_tagdata tagdata[] = {
 
 int main() {
     static hopc_runtime runtime = { .tagdata = tagdata };
-    hword_t mem[10];
 
-    hword_t *roots[ROOTS+1] = {0};
-    int types[] = {TUPLE1, TUPLE2, TUPLE3, TUPLE4};
+    printf("hcell size: %d %d\n", sizeof(hcell), CELLS(sizeof(hcell)));
+    printf("hopc_task: %d %d\n", sizeof(hopc_task), hopc_tagsize(&runtime, HOPCTASKTAG));
+    printf("HOPC_AR_HEAD: %d\n", HOPC_AR_HEAD);
+    printf("hopc_closure: %d %d\n", sizeof(hopc_closure), CELLS(sizeof(hopc_closure)));
 
-    int r = ROOTS, i = 0, j = 0, tag = 0;
+    return 0;
+/*    hword_t mem[10];*/
 
-    memchunk *memc = 0;
-    hword_t *chunk = 0, *chunk2 = 0;
-    hword_t len = 0;
-    hword_t total = 0;
-    hword_t tmp = 0;
-    hword_t tmp1 = 0;
-    hopc_task *taskp = 0;
-    hopc_task *taskp2 = 0;
-    int m = ROOTS/2;
+/*    hword_t *roots[ROOTS+1] = {0};*/
+/*    int types[] = {TUPLE1, TUPLE2, TUPLE3, TUPLE4};*/
 
-    srand(time(0));
+/*    int r = ROOTS, i = 0, j = 0, tag = 0;*/
 
-    hopc_init_runtime(&runtime, heap, (sizeof(heap)/sizeof(hword_t)));
+/*    memchunk *memc = 0;*/
+/*    hword_t *chunk = 0, *chunk2 = 0;*/
+/*    hword_t len = 0;*/
+/*    hword_t total = 0;*/
+/*    hword_t tmp = 0;*/
+/*    hword_t tmp1 = 0;*/
+/*    hopc_task *taskp = 0;*/
+/*    hopc_task *taskp2 = 0;*/
+/*    int m = ROOTS/2;*/
 
-    printf("sizeof(memchunk): %d\n", sizeof(memchunk)/sizeof(hword_t));
-    printf("sizeof(hopc_task) (bytes): %d\n", sizeof(hopc_task));
+/*    srand(time(0));*/
 
-    total = hopc_gc_maxmem(&runtime) - hopc_gc_freemem(&runtime);
-    printf("top: 0x%08X end: 0x%08X, total: %d, free: %d\n", runtime.gc.top, runtime.gc.heapend_p, total, hopc_gc_freemem(&runtime));
+/*    hopc_init_runtime(&runtime, heap, (sizeof(heap)/sizeof(hword_t)));*/
 
-    hopc_insert_task(&runtime);
-    hopc_insert_task(&runtime);
+/*    printf("%d %d %d %d\n", sizeof(hword_t*), sizeof(hword_t), sizeof(unsigned int), sizeof(unsigned long));*/
+/*    printf("sizeof(hcell): %d\n", sizeof(hcell));*/
+/*    printf("sizeof(memchunk): %d\n", sizeof(memchunk)/sizeof(hword_t));*/
+/*    printf("sizeof(hopc_task) (bytes): %d\n", sizeof(hopc_task));*/
+/*    exit(0);*/
 
-    hopc_gc_alloc_chunk(&runtime, TUPLE1);
+/*    total = hopc_gc_maxmem(&runtime) - hopc_gc_freemem(&runtime);*/
+/*    printf("top: 0x%08X end: 0x%08X, total: %d, free: %d\n", runtime.gc.top, runtime.gc.heapend_p, total, hopc_gc_freemem(&runtime));*/
 
-    hopc_insert_task(&runtime);
-    hopc_insert_task(&runtime);
-    taskp2 = hopc_insert_task(&runtime);
-    hopc_insert_task(&runtime);
+/*    hopc_insert_task(&runtime);*/
+/*    hopc_insert_task(&runtime);*/
 
-    hopc_gc_alloc_chunk(&runtime, TUPLE2);
+/*    hopc_gc_alloc_chunk(&runtime, TUPLE1);*/
 
-    hopc_insert_task(&runtime);
+/*    hopc_insert_task(&runtime);*/
+/*    hopc_insert_task(&runtime);*/
+/*    taskp2 = hopc_insert_task(&runtime);*/
+/*    hopc_insert_task(&runtime);*/
 
-    hopc_gc_alloc_chunk(&runtime, TUPLE4);
+/*    hopc_gc_alloc_chunk(&runtime, TUPLE2);*/
 
-    hopc_insert_task(&runtime);
+/*    hopc_insert_task(&runtime);*/
 
-    total = hopc_gc_maxmem(&runtime) - hopc_gc_freemem(&runtime);
-    printf("top: 0x%08X end: 0x%08X, total: %d, free: %d\n", runtime.gc.top, runtime.gc.heapend_p, total, hopc_gc_freemem(&runtime));
+/*    hopc_gc_alloc_chunk(&runtime, TUPLE4);*/
 
-    for(taskp = runtime.taskheadp; taskp; taskp = taskp->next) {
-        printf("TASK: 0x%08X %08X\n", taskp, taskp->id);
-    }
+/*    hopc_insert_task(&runtime);*/
 
-    hopc_delete_task(&runtime, 5);
+/*    total = hopc_gc_maxmem(&runtime) - hopc_gc_freemem(&runtime);*/
+/*    printf("top: 0x%08X end: 0x%08X, total: %d, free: %d\n", runtime.gc.top, runtime.gc.heapend_p, total, hopc_gc_freemem(&runtime));*/
 
-    dump_heap3(&runtime, ROOTS, roots);
-    hopc_gc_collect(&runtime);
+/*    for(taskp = runtime.taskheadp; taskp; taskp = taskp->next) {*/
+/*        printf("TASK: 0x%08X %08X\n", taskp, taskp->id);*/
+/*    }*/
 
-    printf("-- after collecting\n");
-    dump_heap3(&runtime, ROOTS, roots);
-    printf("top: 0x%08X end: 0x%08X, total: %d, free: %d\n", runtime.gc.top, runtime.gc.heapend_p, total, hopc_gc_freemem(&runtime));
+/*    hopc_delete_task(&runtime, 5);*/
 
-    for(taskp = runtime.taskheadp; taskp; taskp = taskp->next) {
-        printf("TASK: 0x%08X %08X\n", taskp, taskp->id);
-    }
+/*    dump_heap3(&runtime, ROOTS, roots);*/
+/*    hopc_gc_collect(&runtime);*/
 
-    hopc_delete_task(&runtime, 4);
+/*    printf("-- after collecting\n");*/
+/*    dump_heap3(&runtime, ROOTS, roots);*/
+/*    printf("top: 0x%08X end: 0x%08X, total: %d, free: %d\n", runtime.gc.top, runtime.gc.heapend_p, total, hopc_gc_freemem(&runtime));*/
 
-    dump_heap3(&runtime, ROOTS, roots);
-    hopc_gc_collect(&runtime);
+/*    for(taskp = runtime.taskheadp; taskp; taskp = taskp->next) {*/
+/*        printf("TASK: 0x%08X %08X\n", taskp, taskp->id);*/
+/*    }*/
 
-    printf("-- after collecting\n");
-    dump_heap3(&runtime, ROOTS, roots);
-    printf("top: 0x%08X end: 0x%08X, total: %d, free: %d\n", runtime.gc.top, runtime.gc.heapend_p, total, hopc_gc_freemem(&runtime));
+/*    hopc_delete_task(&runtime, 4);*/
 
-    for(taskp = runtime.taskheadp; taskp; taskp = taskp->next) {
-        printf("TASK: 0x%08X %08X\n", taskp, taskp->id);
-    }
+/*    dump_heap3(&runtime, ROOTS, roots);*/
+/*    hopc_gc_collect(&runtime);*/
+
+/*    printf("-- after collecting\n");*/
+/*    dump_heap3(&runtime, ROOTS, roots);*/
+/*    printf("top: 0x%08X end: 0x%08X, total: %d, free: %d\n", runtime.gc.top, runtime.gc.heapend_p, total, hopc_gc_freemem(&runtime));*/
+
+/*    for(taskp = runtime.taskheadp; taskp; taskp = taskp->next) {*/
+/*        printf("TASK: 0x%08X %08X\n", taskp, taskp->id);*/
+/*    }*/
 
 /*    dump_heap3(&runtime, ROOTS, roots);*/
 
@@ -158,23 +168,22 @@ int main() {
 /*    dump_heap3(&runtime, ROOTS, roots); */
 /*    dump_heap2(&runtime, ROOTS, roots);*/
 /*    dump_heap(&runtime, ROOTS, roots);*/
-    printf("--\n");
+/*    printf("--\n");*/
 
-    return 0;
 }
 
-void dump_heap3(hopc_runtime *runtime, hword_t num, hword_t **roots) {
-    hword_t *chunk = 0;
-    memchunk *memc;
-    for(chunk = runtime->gc.top-1; chunk >= runtime->gc.heapstart_p; chunk = hopc_gc_prev_chunk(runtime, chunk)) {
-        memc = (memchunk*)chunk;
-        printf("; 0x%08X %s %d %d %04X\n", chunk, 
-                                           (memc->t.gc_alive?"alive":"dead"),
-                                           hopc_tagsize(runtime, memc->t.tag),
-                                           hopc_gc_chunksize(runtime, chunk), 
-                                           memc->t.tag);
-    }
-}
+/*void dump_heap3(hopc_runtime *runtime, hword_t num, hword_t **roots) {*/
+/*    hword_t *chunk = 0;*/
+/*    memchunk *memc;*/
+/*    for(chunk = runtime->gc.top-1; chunk >= runtime->gc.heapstart_p; chunk = hopc_gc_prev_chunk(runtime, chunk)) {*/
+/*        memc = (memchunk*)chunk;*/
+/*        printf("; 0x%08X %s %d %d %04X\n", chunk, */
+/*                                           (memc->t.gc_alive?"alive":"dead"),*/
+/*                                           hopc_tagsize(runtime, memc->t.tag),*/
+/*                                           hopc_gc_chunksize(runtime, chunk), */
+/*                                           memc->t.tag);*/
+/*    }*/
+/*}*/
 
 
 /*void dump_heap(hopc_runtime *runtime, hword_t num, hword_t **roots) {*/
