@@ -65,7 +65,6 @@ main = do
           k'' <- return k'  >>= Cn.propagate
                             >>= B.betaReduceM
                             >>= L.flattenM
---          c1 <- C.conv2 k'' >>= E.eliminate
           c1' <- C.conv2 k''
           c1 <- E.eliminate c1'
 
@@ -74,7 +73,7 @@ main = do
           ep <- getEntryPoint >>= return.fromJust
           vm <- forM procs $ \p@(I.Proc {I.name = n, I.body = g, I.entry = e}) -> do
                   live <- lift $ L.live e g
-                  let asap = spillASAP dict live p
+                  asap <- spillASAP dict live p
 --                  trace ("SPILL ASAP " ++ n) $ trace ((show asap) ++ ";") $ return ()
                   alloc <- lift $ R.allocateLinearScan dict live asap p
 --                  trace ("Reg. Allocation " ++ n) $ trace (show (V.alloc alloc)) $ return ()
@@ -82,6 +81,8 @@ main = do
                   lift $ fromIR dict live alloc p
           code <- W.write ep vm
           return $ [RCCode code]
+--          return $ [RKTree k'', RClos c1', RClos c1, RVm vm, RCCode code]
+--          return $ [RKTree k'', RClos c1', RClos c1, RVm vm, RCCode code]
 --          return $ [RKTree k'', RClos c1, RVm vm, RCCode code]
 --          return $ RClos c1
         return st

@@ -57,9 +57,11 @@ write ep p = do
       indent $ stmt $ "hcell heap[HOPCINITIALHEAPSIZE] = { { .w = 0 } }"
 
       empty
+
       cp <- asks checkpoints
       forM_ (M.toList cp) $ \(l, n) -> do
         noindent $ printf "#define %s %d" (decorateCaseLbl (show l)) n
+
 
       empty
 
@@ -355,6 +357,7 @@ write ep p = do
     funVars = undefined
 
     entrypointsMap =
+--      trace "entrypointsMap" $ trace (intercalate "\n" (map (const "QQ") p)) $
       M.fromList $ map (\p@(Proc{name=fn, entrypoint=l}) -> (fn, l)) p
 
     envInit r t = CWriterEnv entrypointsMap (checkpointsMap entrypointsMap) sconsts r t

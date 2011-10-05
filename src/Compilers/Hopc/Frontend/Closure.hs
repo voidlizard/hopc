@@ -10,6 +10,7 @@ import Data.Either
 import Control.Monad.State
 import Control.Monad.Trans
 import Control.Monad.Error
+import Control.Monad.Writer
 import Data.Data
 import Data.Typeable
 import Data.Generics.PlateData
@@ -38,7 +39,6 @@ data Closure =  CInt Integer
               | CApplCls KId [KId]
               | CApplDir KId [KId]
              deriving (Show, Eq, Data, Typeable)
-
 
 data C2 = C2 { cfn :: M.Map KId KTree, cseen :: M.Map KId (S.Set KId), cfree :: M.Map KId [KId] }
 data C3 = C3 { fv :: KId -> [KId],
@@ -132,7 +132,9 @@ conv2 k' = do
 
         addEntry False fn nf
 
-    return cl''
+    cfinal <- withWrappers cl''
+    forM_ [n|(CMakeCls n _) <- universe cfinal] $ \n -> addClosure n
+    return cfinal
 
     where 
           p :: KTree -> C2M Closure
@@ -200,7 +202,7 @@ conv2 k' = do
             let f' = (fv2 c) n f
             if f' == f
                 then return Nothing
-                else return $ Just $ CMakeCls n (Just f')
+                else return $ Just $ CMakeCls ((rn c) n) (Just f')
 
           r c (CFun (Fun fn a f b)) = do
 --            b <- eliminate b'
@@ -235,12 +237,42 @@ conv2 k' = do
           a (CCond n _ _) r = n : concat r
           a x r = concat r
 
-          addFns (CLet n c c2) q = CLetR (q ++ [(n, c)]) c2
-          addFns (CLetR b c2)  q = CLetR (q ++ b) c2
-
           init = C2 M.empty M.empty M.empty
           initf v@(C2 {cfree = fr}) f = v {cfree = f}
 
+
+addFns (CLet n c c2) q = CLetR (q ++ [(n, c)]) c2
+addFns (CLetR b c2)  q = CLetR (q ++ b) c2
+
+withWrappers :: Closure -> CompileM Closure
+withWrappers cl = do
+  e <- getEntries
+  let bs = M.fromList [(n,n) | (CMakeCls n args) <- universe cl]
+  let fs = e `M.intersection` bs
+  (_,funcs) <- runWriterT $ 
+    forM_ (M.toList fs) $ ifNativeFun $ \(n,t@(TFun (TFunForeign fn) a r)) -> do
+      tmps <- lift $ mapM (const nextTmp) a >>= return . map (((++) "ta_").show)
+      let wrap = (fname_wrap n)
+--      trace (printf "%s %s %s" wrap  (show t) (show tmps)) $ return ()
+      tell [(fn, (wrap, CFun (Fun wrap tmps [] (CApplDir fn tmps))))]
+      lift $ addEntry False wrap (TFun TFunLocal a r)
+
+  let remap = M.fromList $ map (\x -> (fst x, (fst.snd) x)) funcs
+
+  return $ addFns (rewriteBi (trCls remap) cl) (map snd funcs)
+
+  where 
+    ifNativeFun :: ((KId, HType) -> WT ()) -> (KId, HType) -> WT () 
+    ifNativeFun m x@(n, TFun (TFunForeign  fn) a r) = m x 
+    ifNativeFun m _ = return ()
+  
+    trCls r (CMakeCls n args) = maybe Nothing (\n -> Just (CMakeCls n args)) (M.lookup n r)
+    trCls _ _ = Nothing
+
+
+type WT = WriterT [(KId, (KId, Closure))] CompileM
+
+fname_wrap n = "fun_wrap_" ++ n
 
 fname n = "fun_" ++ n
 

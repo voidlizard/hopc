@@ -22,7 +22,7 @@ type Dict = M.Map KId Entry
 
 type TDict = M.Map KId HType
 
-data CompileState = CompileState { cdict :: Dict, centry :: Maybe KId, ctmpid :: Int }
+data CompileState = CompileState { cdict :: Dict, centry :: Maybe KId, ctmpid :: Int, cclosures :: S.Set KId }
                     deriving (Show)
 
 newtype CompileT m a = CompileT {
@@ -44,7 +44,7 @@ type CompileM = CompileT M
 
 runCompile init f = runErrorT (runStateT (runT f) init)
 
-initCompile = CompileState M.empty Nothing 0
+initCompile = CompileState M.empty Nothing 0 S.empty
 
 retvalVariable = "RETVAL"
 activationRecordVariable = "CLOSURE"
@@ -77,6 +77,12 @@ getConstraints = do
 
 entryList :: CompileM [(KId,Entry)]
 entryList = gets (M.toList.cdict)
+
+addClosure :: KId -> CompileM ()
+addClosure n = modify (\s -> s{cclosures = S.insert n (cclosures s)})
+
+isClosure :: KId -> CompileM Bool
+isClosure n = gets (S.member n . cclosures)
 
 names :: CompileM (S.Set KId)
 names = gets (M.keysSet . cdict)

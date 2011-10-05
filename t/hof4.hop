@@ -1,0 +1,34 @@
+($ foreign "display" display ((:string) :unit) $)
+($ foreign "newline" newline ((:unit) :unit)   $)
+
+;;#lang scheme
+
+(define (pysh)
+  (display "BOO")
+  (newline)
+  (display "PYSH")
+  (newline)
+)
+
+(define (piu s) 
+  (display "JOPA")
+  (newline)
+  (display s)
+  (newline)
+  (pysh)
+  (newline)
+  (newline)
+)
+
+(define (f1 fput) (fput "PIU"))
+
+(define (qq a) (pysh))
+
+(qq)
+
+(f1 piu)
+
+(f1 display)
+
+
+

@@ -426,8 +426,10 @@ freevars :: Int -> [KId] -> [KId]
 freevars n as | n > 0  = drop (length as - n) as
               | otherwise = []
 
-spillASAP :: TDict -> FactBase Live -> I.Proc -> S.Set KId 
-spillASAP dict live (I.Proc{I.body=g, I.args=as, I.freevarsnum=fvn}) = ofProc $ foldGraphNodes node g S.empty
+spillASAP :: TDict -> FactBase Live -> I.Proc -> CompileM (S.Set KId)
+spillASAP dict live (I.Proc{I.body=g, I.args=as, I.freevarsnum=fvn, I.name=fname}) = do
+  clos <- isClosure fname
+  return $ ofProc clos $ foldGraphNodes node g S.empty
   where 
     node :: forall e x . Insn e x -> S.Set KId -> S.Set KId 
     node (I.Call l ct _ _ ) acc = varsOf l (varType (callvar ct) dict) `S.union` acc
@@ -437,16 +439,16 @@ spillASAP dict live (I.Proc{I.body=g, I.args=as, I.freevarsnum=fvn}) = ofProc $ 
     varsOf l (TFun TFunLocal _ _) = maybe S.empty id $ lookupFact l live
     varsOf l _ = S.empty
 
-    ofProc :: S.Set KId -> S.Set KId
+    ofProc :: Bool -> S.Set KId -> S.Set KId
 --    ofProc asap = arv `S.union` fvs `S.union` (spills `S.intersection` asap)
-    ofProc asap = spills `S.intersection` ( arv `S.union` fvs `S.union` asap )
+    ofProc clos asap = spills `S.intersection` ( arv clos `S.union` fvs `S.union` asap )
 
     spills = S.fromList $ activationRecordVariable:as
 
     fvs = S.fromList $ freevars fvn as
 
-    arv | fvn > 0 = S.singleton activationRecordVariable
-        | otherwise = S.empty
+    arv c | c || fvn > 0 = S.singleton activationRecordVariable
+          | otherwise = S.empty
 
 varType :: KId -> TDict -> HType 
 varType n rdict =
