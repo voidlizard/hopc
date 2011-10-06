@@ -318,6 +318,10 @@ write ep p = do
       shift $ stmt $ printf "P(%s) = (hword_t*)hopc_make_closure(runtime, %s, (hcell*)P(%s), HOPCCLOSURETAG)" (reg rt) cl (reg rt)
       empty
 
+    opcode _ (Checkpoint regs) = do
+      let ptrs = map fst $ filter (isPtr.snd) (S.toList regs)
+      shiftIndent $ comment (printf "GC CHECKPOINT INSERTED HERE: %s" (show ptrs))
+
     opcode _ x = shiftIndent $ comment $ show x
 
     shiftIndent :: CWriterM () -> CWriterM ()
@@ -389,6 +393,11 @@ write ep p = do
       return (sortBy cmp tagl, tagref)
       where tagOf (Proc{name=nm, slotnum=sn}) = (nm, TagRecord (2+sn)) -- FIXME: constant hardcoding!
             cmp a b = compare (fst a) (fst b)
+
+isPtr :: HType -> Bool
+isPtr (TFun _ _ _) = True
+isPtr _ = False
+
 
 type CWriterM = StateT Int (WriterT [String] (ReaderT CWriterEnv CompileM))
 data CWriterEnv = CWriterEnv { entrypoints :: M.Map KId Label

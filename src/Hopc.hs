@@ -83,8 +83,8 @@ main = do
 --                  trace ("Spilled " ++ n) $ trace (show (V.spill alloc)) $ return ()
                   lift $ fromIR dict live alloc p
           code <- W.write ep vm
---          return $ [RCCode code]
-          return $ [RKTree k'', RClos c1', RClos c1, RVm vm, RCCode code]
+          return $ [RCCode code]
+--          return $ [RKTree k'', RClos c1', RClos c1, RVm vm, RCCode code]
 --          return $ [RKTree k'', RClos c1', RClos c1, RVm vm, RCCode code]
 --          return $ [RKTree k'', RClos c1, RVm vm, RCCode code]
 --          return $ RClos c1
