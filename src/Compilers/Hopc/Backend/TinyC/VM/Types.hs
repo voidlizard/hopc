@@ -5,6 +5,7 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 
 import Compilers.Hopc.Id (KId)
+import Compilers.Hopc.Frontend.Types (HType)
 import Compilers.Hopc.Backend.TinyC.Lit
 import qualified Compilers.Hopc.Backend.TinyC.R as R
 
@@ -38,6 +39,7 @@ data Op  =   Label Label
            | BranchFalse R Label
            | BranchTrue  R Label
            | Nop
+           | Checkpoint (S.Set (R,HType))
            | Return
 
 data Proc = Proc { name :: KId
@@ -66,6 +68,7 @@ instance Show (Op) where
   show (BranchTrue r l1)  = ind $ "branch-true "   ++ (show r) ++ " " ++ (show l1)
   show (BranchFalse r l1) = ind $ "branch-false " ++ (show r) ++ " " ++ (show l1)
   show (Nop)              = ind $ "nop" 
+  show (Checkpoint cp)    = ind $ "checkpoint " ++ show (S.toList cp)
   show (Return)           = ind $ "return "
 
 ind :: String -> String

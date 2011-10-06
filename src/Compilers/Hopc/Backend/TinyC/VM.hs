@@ -97,11 +97,14 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as,
       let ret = case ur of
                 []  -> Move rv R1 : unsp ++ [Return]
                 x   -> ur ++ unsp ++ [Return]
-      chunkM ret
+      l <- gets rsLabel
+      cp <- makeCheckpoint [R1] []
+      chunkM $ cp ++ ret
 
     trNode (I.Return n) = do
       unsp <- unspill activationRecordVariable (Just closureReg)
-      chunkM $ unsp ++ [Return] 
+      cp <- makeCheckpoint [R1] []
+      chunkM $ cp ++ unsp ++ [Return]
 
     trNode (I.MkClos fn args var) = do
       uns <- mapM (\x -> unspill x Nothing) args >>= return . concat
@@ -154,7 +157,8 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as,
       mapM_ delSpill (map fst s)
       retR <- reg r
 --      trace "CALL OF" $ trace (show n) $ trace (show rt) $ return ()
-      chunkM $ call ++ [Label lbl] ++ movRet rt retR ++ unsp ++ [Branch l]
+      cp <- makeCheckpoint [] [retR]
+      chunkM $ cp ++ call ++ [Label lbl] ++ movRet rt retR ++ unsp ++ [Branch l]
       where callF (I.Direct n _)  lbl rs = return $ CallL lbl n rs
             callF (I.Closure n _) lbl rs = do
               r <- reg n
@@ -297,6 +301,33 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as,
       case M.lookup n ra of
         Just r  -> return r
         Nothing -> error $ "INTERNAL COMPILER ERROR / NO REG ALLOCATED " ++ " " ++ (show n) -- FIXME
+
+    makeCheckpoint :: [R] -> [R] -> TrM TOp
+    makeCheckpoint incl excl = do
+      l <- gets rsLabel
+      ra <- gets (M.lookup l . rsAllocTrack) >>= return . maybe M.empty id
+      let rt = rettype $ varType n dict
+      let lr = ra `M.intersection` (livevars l)
+      let dict' = M.insert retvalVariable rt dict
+      let types = dict' `M.intersection` lr
+      let rtypes = exclude $ catMaybes $ map (typeof types) (M.toList lr)
+      rf <- gets rsFree
+ 
+--      trace ("CHECKPOINT " ++ show l) $
+--        trace (show rtypes) $
+--          trace (show rf) $
+--            return ()
+
+      chunkMs $ Checkpoint (S.fromList rtypes)
+      where
+        livevars l =
+          maybe M.empty (\s -> M.fromList (zip (S.toList s) (repeat ""))) (lookupFact l live)
+        
+        typeof :: M.Map KId HType -> (KId,R) -> Maybe (R, HType) 
+        typeof types (n,r) = maybe Nothing (Just.((,)r)) (M.lookup n types)
+
+        exclude :: [(R,HType)] -> [(R,HType)]
+        exclude = filter (not.(flip elem excl).fst)
 
     liftVM :: forall e x. (Insn e x -> TrM TOp) -> Insn e x -> TrM TOp -> TrM TOp
     liftVM f n z = do
@@ -449,6 +480,10 @@ spillASAP dict live (I.Proc{I.body=g, I.args=as, I.freevarsnum=fvn, I.name=fname
 
     arv c | c || fvn > 0 = S.singleton activationRecordVariable
           | otherwise = S.empty
+
+rettype :: HType -> HType
+rettype (TFun _ _ rt) = rt
+rettype x = x
 
 varType :: KId -> TDict -> HType 
 varType n rdict =

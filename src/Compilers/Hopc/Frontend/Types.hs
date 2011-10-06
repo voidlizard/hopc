@@ -9,12 +9,12 @@ import Compilers.Hopc.Typing.Types
 
 import Debug.Trace
 
-data TFunSpec = TFunForeign KId | TFunLocal deriving (Eq, Show, Data, Typeable)
+data TFunSpec = TFunForeign KId | TFunLocal deriving (Eq, Show, Ord, Data, Typeable)
 
 data HType = TVar TypeId | TAny TypeId
              | TInt | TStr | TBool | TUnit | TFun TFunSpec [HType] HType
              | TAppl TypeId
-             deriving (Show, Eq, Data, Typeable)
+             deriving (Show, Eq, Ord, Data, Typeable)
 
 
 --instance Compilers
