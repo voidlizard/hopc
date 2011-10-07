@@ -333,10 +333,9 @@ write ep p = do
       let ptrs = M.fromList [(fst r, 0) |r <- filter (isPtr.snd) (S.toList regs)]
       let regmask = foldl setBit (0::Word) (M.elems (allr `M.intersection` ptrs))
       let sregmask = printf "%d" regmask :: String
-      shiftIndent $ comment (printf "GC CHECKPOINT. REGMASK: %s" sregmask)
-      shiftIndent $ comment (intercalate "\n" (map show (map fst (M.toList ptrs))))
-      shift $ stmt $ printf "HOPCTASKREGMASK(runtime, %s)" sregmask
-
+      let regsc = intercalate " " (map show (reverse (map fst (M.toList ptrs))))
+      shiftIndent $ comment (printf "GC CHECKPOINT. REGMASK: %s %s [%s]" sregmask (drawBits regmask) regsc)
+      shift $ stmt $ printf "HOPCTASKREGMASK(runtime, %s)" sregmask 
     opcode _ x = shiftIndent $ comment $ show x
 
     shiftIndent :: CWriterM () -> CWriterM ()
@@ -432,9 +431,12 @@ slotCellNum n =  n `div` regNum + (if n `mod` regNum /= 0 then 1 else 0)
 
 isPtr :: HType -> Bool
 isPtr (TFun _ _ _) = True
-isPtr TStr  = True
+--isPtr TStr  = True
 isPtr _ = False
 
+drawBits v = map (b . testBit v) (reverse [0..(regNum-1)])
+  where b True = '1'
+        b False = '0'
 
 type CWriterM = StateT Int (WriterT [String] (ReaderT CWriterEnv CompileM))
 data CWriterEnv = CWriterEnv { entrypoints :: M.Map KId Label

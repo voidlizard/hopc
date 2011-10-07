@@ -94,17 +94,19 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as,
       ur  <- unspill n (Just R1)
       unsp <- unspill activationRecordVariable (Just closureReg)
       rv <- reg n
+      rsa <- rsAllocLive
+      cp <- makeCheckpoint rsa []
       let ret = case ur of
-                []  -> Move rv R1 : unsp ++ [Return]
-                x   -> ur ++ unsp ++ [Return]
+                []  -> Move rv R1 : unsp  ++ cp ++ [Return]
+                x   -> ur ++ unsp ++ cp ++ [Return]
       l <- gets rsLabel
-      cp <- makeCheckpoint [R1] []
       chunkM $ cp ++ ret
 
     trNode (I.Return n) = do
       unsp <- unspill activationRecordVariable (Just closureReg)
-      cp <- makeCheckpoint [R1] []
-      chunkM $ cp ++ unsp ++ [Return]
+      rsa <- rsAllocLive
+      cp <- makeCheckpoint rsa []
+      chunkM $ unsp ++ cp ++ [Return]
 
     trNode (I.MkClos fn args var) = do
       uns <- mapM (\x -> unspill x Nothing) args >>= return . concat
@@ -151,14 +153,16 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as,
       uns <- mapM (\x -> unspill x Nothing) (callv ct args) >>= return . concat
       rs <- mapM reg args
       lbl <- newLabel
+      rf <- gets rsFree
+      cpAlloc <- rsAllocLive
       callfun <- callF ct lbl rs
-      call <- callRet rt r (chunkMs . callfun) >>= \x -> chunkM $ spl ++ uns ++ x
       unsp <- mapM (\(n,r) -> unspill n (Just r)) s >>= return . concat
       mapM_ delSpill (map fst s)
       retR <- reg r
+      cp <- makeCheckpoint cpAlloc [retR]
+      call <- callRet rt r (chunkMs . callfun) >>= \x -> chunkM $ spl ++ uns ++ cp ++ x
 --      trace "CALL OF" $ trace (show n) $ trace (show rt) $ return ()
-      cp <- makeCheckpoint [] [retR]
-      chunkM $ cp ++ call ++ [Label lbl] ++ movRet rt retR ++ unsp ++ [Branch l]
+      chunkM $ call ++ [Label lbl] ++ movRet rt retR ++ unsp ++ [Branch l]
       where callF (I.Direct n _)  lbl rs = return $ CallL lbl n rs
             callF (I.Closure n _) lbl rs = do
               r <- reg n
@@ -302,21 +306,28 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as,
         Just r  -> return r
         Nothing -> error $ "INTERNAL COMPILER ERROR / NO REG ALLOCATED " ++ " " ++ (show n) -- FIXME
 
-    makeCheckpoint :: [R] -> [R] -> TrM TOp
-    makeCheckpoint incl excl = do
+    rsAllocLive :: TrM (M.Map KId R)
+    rsAllocLive = do
+      rsa <- gets rsAlloc
+      rsf <- gets rsFree >>= return . M.fromList . (flip zip (repeat 0))
+--      trace ("rsAllocLive " ++ n) $ trace (show rsa) $ trace (show rsf) $ trace "---" $ return ()
+      return $ M.filter (not.(flip M.member rsf)) rsa
+
+    makeCheckpoint :: M.Map KId R -> [R] -> TrM TOp
+    makeCheckpoint rsa excl = do
       l <- gets rsLabel
-      ra <- gets (M.lookup l . rsAllocTrack) >>= return . maybe M.empty id
+      let ra = rsa
       let rt = rettype $ varType n dict
       let lr = ra `M.intersection` (livevars l)
       let dict' = M.insert retvalVariable rt dict
       let types = dict' `M.intersection` lr
       let rtypes = exclude $ catMaybes $ map (typeof types) (M.toList lr)
-      rf <- gets rsFree
  
 --      trace ("CHECKPOINT " ++ show l) $
---        trace (show rtypes) $
---          trace (show rf) $
---            return ()
+--        trace "rsAlloc" $
+--          trace (show rsa) $
+--            trace (show rtypes) $
+--                return ()
 
       chunkMs $ Checkpoint (S.fromList rtypes)
       where
