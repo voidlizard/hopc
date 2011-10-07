@@ -12,8 +12,8 @@ static inline hcell *hopc_ar_chunk_start(hopc_runtime *r, hopc_ar*);
 
 memchunk *hopc_get_task_chunk(hopc_runtime *r, hopc_task *t);
 void hopc_gc_update_pointers(hopc_runtime *r, hcell *left, hword_t shift);
-void hopc_gc_update_chunk_pointers(hopc_runtime *r, hcell* lb, hword_t shift, hword_t size, hcell *raw, const unsigned char *mask);
-void hopc_gc_mark_chunk_pointers(hopc_runtime *r, hword_t size, hcell *raw, const unsigned char *mask);
+void hopc_gc_update_chunk_pointers(hopc_runtime *r, hcell* lb, hword_t shift, hword_t size, hcell *raw, const hregmask*);
+void hopc_gc_mark_chunk_pointers(hopc_runtime *r, hword_t size, hcell *raw, const hregmask*);
 hopc_ar *hopc_gc_update_ar_pointers(hopc_runtime *r, hopc_task *tp, hcell *lb, hword_t shift);
 void hopc_gc_update_task_pointers(hopc_runtime *r, hcell *lb, hword_t shift);
 memchunk* hopc_gc_prev_chunk(hopc_runtime *r, memchunk *p);
@@ -30,7 +30,7 @@ void hopc_gc_mark_root_alive(hopc_runtime *runtime, memchunk *chunk);
 
 
 void hopc_out_of_mem_hook(hopc_runtime *r) {
-    printf("*** OUT OF MEMORY");
+    fprintf(stderr, "*** OUT OF MEMORY");
     exit(-1); // FIXME
 }
 
@@ -76,7 +76,7 @@ hcell *hopc_gc_alloc_chunk(hopc_runtime *runtime, htag tag) {
         chunk->t.gc_alive = 0;
         chunk->t.gc_follow = 1;
         chunk->t.tag = tag;
-        printf("allocated: %08X %d %d %04X free: %d\n", chunk, size, hopc_tagsize(runtime, tag), tag, (runtime->gc.heapend_p - runtime->gc.top));
+        fprintf(stderr, "allocated: %08X %d %d %04X free: %d\n", chunk, size, hopc_tagsize(runtime, tag), tag, (runtime->gc.heapend_p - runtime->gc.top));
         return (hcell*)chunk;
     }
     hopc_out_of_mem_hook(runtime);
@@ -102,11 +102,11 @@ hopc_task *hopc_insert_task(hopc_runtime *runtime) {
     t->id = runtime->taskid++;
     t->next = runtime->taskheadp;
     runtime->taskheadp = t;
-    printf("ALLOC TASK CHUNK: 0x%08X 0x%08X\n", t, chunk);
+    fprintf(stderr, "ALLOC TASK CHUNK: 0x%08X 0x%08X\n", t, chunk);
     hopc_gc_mark_root_alive(runtime, ((memchunk*)chunk));
     t->arhead = 0;
     memset(t->regs, 0, sizeof(hcell)*HOPCREGNUM);
-    memset(t->mask, 0, HOPCTASKMASKSIZE);
+    t->mask = 0;
     return t;
 }
 
@@ -180,24 +180,31 @@ hcell hopc_unspill(hopc_runtime *r, hword_t slot) {
   return r->taskheadp->arhead->slots[slot];
 }
 
-void hopc_gc_update_chunk_pointers(hopc_runtime *r, hcell* lb, hword_t shift, hword_t size, hcell *raw, const unsigned char *mask) {
-    while(--size) {
-        if( BITGET(mask, size) ) {
+#define BMASKWORD(i) ((i)/(sizeof(hregmask)*2))
+#define BOFF(i) ((i)%(sizeof(hregmask)*2))
+
+void hopc_gc_update_chunk_pointers(hopc_runtime *r, hcell* lb, hword_t shift, hword_t size, hcell *raw, const hregmask *mask) {
+    hword_t i = 0;
+    for(i = 0; i < size; i++) {
+        if( BITGET(mask[BMASKWORD(i)], BOFF(i)) ) {
             raw[size].p = (hword_t*)PTRSHIFT(raw[size].p, lb, shift);
         }
     }
 }
 
 void hopc_gc_collect(hopc_runtime* r) {
+    fprintf(stderr, "hopc_gc_collect\n");
     hopc_gc_mark_roots(r);
-    hopc_gc_mark(r);
-    hopc_gc_compact(r);
-    hopc_gc_mark_dead(r);
+/*    hopc_gc_mark(r);*/
+/*    hopc_gc_compact(r);*/
+/*    hopc_gc_mark_dead(r);*/
 }
 
-void hopc_gc_mark_chunk_pointers(hopc_runtime *r, hword_t size, hcell *raw, const unsigned char *mask) {
-    while(--size) {
-        if( BITGET(mask, size) ) {
+void hopc_gc_mark_chunk_pointers(hopc_runtime *r, hword_t size, hcell *raw, const hregmask *mask) {
+    hword_t i = 0;
+    for(i = 0; i < size; i++) {
+        if( BITGET(mask[BMASKWORD(i)], BOFF(i)) ) {
+            fprintf(stderr, "marking slot %d as pointer\n", i);
             hopc_gc_mark_root_alive(r, (memchunk*)raw[size].p);
         }
     }
@@ -220,12 +227,12 @@ hopc_ar *hopc_gc_update_ar_pointers(hopc_runtime *r, hopc_task *tp, hcell *lb, h
 void hopc_gc_update_task_pointers(hopc_runtime *r, hcell *lb, hword_t shift) {
     hopc_task *p2 = 0;
     hopc_task *p = r->taskheadp;
-    printf("update task pointers: [0x%08X] 0x%08X %d\n", r->taskheadp, lb, shift);
+    fprintf(stderr, "update task pointers: [0x%08X] 0x%08X %d\n", r->taskheadp, lb, shift);
     while(p) {
         if(p2) p2->next = (hopc_task*)PTRSHIFT(p2->next, lb, shift);
         p2 = p;
         p->arhead = hopc_gc_update_ar_pointers(r, p, lb, shift);
-        hopc_gc_update_chunk_pointers(r, lb, shift, HOPCREGNUM, p->regs, p->mask);
+        hopc_gc_update_chunk_pointers(r, lb, shift, HOPCREGNUM, p->regs, &(p->mask));
         p = p->next;
     }
     r->taskheadp = (hopc_task*)PTRSHIFT(r->taskheadp, lb, shift);
@@ -365,6 +372,7 @@ void hopc_gc_update_pointers(hopc_runtime *r, hcell *left, hword_t shift) {
 
 void hopc_gc_mark_activation_record(hopc_runtime *r, hopc_ar *p) {
     while(p) {
+        fprintf(stderr, "markup activation record 0x%08X\n", p);
         hcell *chunk = ((hcell*)p) + p->size;
         hopc_gc_mark_root_alive(r, (memchunk*)chunk);
         hopc_gc_mark_chunk_pointers(r, HOPC_AR_SLOTS(p), p->slots, r->tagdata[((memchunk*)chunk)->t.tag].pmask);
@@ -375,12 +383,17 @@ void hopc_gc_mark_activation_record(hopc_runtime *r, hopc_ar *p) {
 void hopc_gc_mark_roots(hopc_runtime* r) {
     hopc_task *p = r->taskheadp;
     hcell *chunk = 0;
+
+    fprintf(stderr, "hopc_gc_mark_roots\n");
+    fprintf(stderr, "TASK HEAD: 0x%08X\n", p);
+
     for(; p; p = p->next ) {
-        chunk = hopc_get_task_chunk(r, p);
-        printf("FOUND TASK CHUNK: 0x%08X 0x%08X\n", p, chunk);
+        chunk = (hcell*)hopc_get_task_chunk(r, p);
+        fprintf(stderr, "FOUND TASK CHUNK: 0x%08X 0x%08X\n", p, chunk);
+        fprintf(stderr, "AR: 0x%08X\n", p->arhead);
         hopc_gc_mark_activation_record(r, p->arhead);
         hopc_gc_mark_root_alive(r, (memchunk*)chunk);
-        hopc_gc_mark_chunk_pointers(r, HOPCREGNUM, p->regs, p->mask);
+        hopc_gc_mark_chunk_pointers(r, HOPCREGNUM, p->regs, &(p->mask));
     }
 }
 

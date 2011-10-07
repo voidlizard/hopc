@@ -7,7 +7,11 @@
 
 #include <stdint.h>
 
-typedef unsigned long hword_t ;
+// FIXME: debug
+#include <stdio.h>
+
+typedef unsigned long hword_t;
+typedef uint16_t hregmask;
 
 typedef union {
 	hword_t *p;
@@ -33,7 +37,7 @@ typedef hword_t htag;
 
 typedef struct __hopctagdata {
     hword_t size;
-    unsigned char pmask[HOPCMAXRECORDFIELDS/8];
+    hregmask pmask[HOPCMAXRECORDFIELDS/sizeof(hregmask)];
 } hopc_tagdata;
 
 typedef struct __hopgc {
@@ -61,13 +65,14 @@ typedef struct __closure {
 #define CLOSURE_CP(r, x) (((hopc_closure*)hopc_gc_chunk_start(runtime, (hcell*)((x).p)))->cp)
 
 #define HOPCTASKMASKSIZE BITVECTSIZE(HOPCREGNUM)
+#define HOPCTASKREGMASK(r, m) ((r)->taskheadp->mask = (m))
 
 typedef struct __task {
     struct __task *next;
     hopc_ar *arhead;
     hcell regs[HOPCREGNUM];
     hword_t id;
-    unsigned char mask[HOPCTASKMASKSIZE];
+    hregmask mask;
 } hopc_task;
 
 typedef struct {
@@ -76,6 +81,8 @@ typedef struct {
     hword_t taskid;
     const hopc_tagdata *tagdata;
 } hopc_runtime;
+
+#define HOPC_GC_TRESHOLD(r) (hopc_gc_maxmem((r))/4)
 
 // FIXME: move to hopcruntime.c
 #define TAGBITS ((sizeof(hword_t))*8-2)
@@ -123,7 +130,6 @@ hcell hopc_unspill(hopc_runtime *r, hword_t slot);
 
 void hopc_out_of_mem_hook(hopc_runtime*);
 
-#define BITGET(t, n) (((t)[(n)/8])&(1<<(n)%8))
-#define HOPC_IS_PTR_TAG(t, n) (BITGET(((t)->pmask), (n)))
+#define BITGET(t, n) ((t)&(1<<(n)))
 
 #endif

@@ -15,6 +15,8 @@ import Compiler.Hoopl
 import Data.List
 import Data.Maybe
 import Data.Tuple
+import Data.Bits
+import Data.Word
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Char
@@ -80,7 +82,7 @@ write ep p = do
       tl <- asks spillTags
       comment $ "spill tags"
       forM_ tl $ \(tagn, tagr) -> do
-        shift $ printf ",{%d, {0}} // %d" (tagSize tagr) tagn
+        shift $ printf ",{%d, {%s}} // %d" (tagSize tagr) (intercalate "," (map show (tagMask tagr))) tagn
 --      forM_ (M.toList spillmap) $ \(n, len) -> $ do
 --        indent $ "{}"
 
@@ -134,6 +136,14 @@ write ep p = do
       shift $ goto lep
       empty
       gotoLabel entrypointLabel
+      empty
+      shift $ stmt $ printf "fprintf(stderr, \"\\nR0: %%d REGMASK: %%d\\n\", R0, runtime->taskheadp->mask)"
+      shift $ printf "if( hopc_gc_freemem(runtime) < HOPC_GC_TRESHOLD(runtime) ) {"
+      pushIndent
+      shift $ stmt $ "hopc_gc_collect(runtime)"
+      popIndent
+      shift $ "}"
+      empty
       pushIndent
       indent $ printf "switch(W(%s)) {" (reg retReg)
       pushIndent
@@ -319,8 +329,13 @@ write ep p = do
       empty
 
     opcode _ (Checkpoint regs) = do
-      let ptrs = map fst $ filter (isPtr.snd) (S.toList regs)
-      shiftIndent $ comment (printf "GC CHECKPOINT INSERTED HERE: %s" (show ptrs))
+      let allr = M.fromList (zip (R.allRegs :: [R]) [0..])
+      let ptrs = M.fromList [(fst r, 0) |r <- filter (isPtr.snd) (S.toList regs)]
+      let regmask = foldl setBit (0::Word) (M.elems (allr `M.intersection` ptrs))
+      let sregmask = printf "%d" regmask :: String
+      shiftIndent $ comment (printf "GC CHECKPOINT. REGMASK: %s" sregmask)
+      shiftIndent $ comment (intercalate "\n" (map show (map fst (M.toList ptrs))))
+      shift $ stmt $ printf "HOPCTASKREGMASK(runtime, %s)" sregmask
 
     opcode _ x = shiftIndent $ comment $ show x
 
@@ -386,16 +401,38 @@ write ep p = do
 
     uniqSpillTagMap :: Int -> CompileM ([(Int, TagRecord)], M.Map KId Int)
     uniqSpillTagMap ns = do
-      let tags = map tagOf p
+      dict <- getEntries
+      let tags = map (tagOf dict) p
       let tagn = M.fromList $ zip (S.toList (S.fromList (map snd tags))) [ns..]
       let tagl = map swap $ M.toList tagn
       let tagref = M.fromList $ map (\(n,t) -> (n,fromJust (M.lookup t tagn))) tags
       return (sortBy cmp tagl, tagref)
-      where tagOf (Proc{name=nm, slotnum=sn}) = (nm, TagRecord (2+sn)) -- FIXME: constant hardcoding!
-            cmp a b = compare (fst a) (fst b)
+      where
+        tagOf d (Proc{name=nm, slotnum=sn, allocation=a, entrypoint=e}) =
+          trace ("TAG OF " ++ nm ) $ trace (show (M.lookup e (spill a))) $
+            (nm, TagRecord (2+sn) (spillmask d (M.lookup e (spill a)))) -- FIXME: constant hardcoding!
+ 
+        cmp a b = compare (fst a) (fst b)
+
+    spillmask :: TDict -> Maybe (S.Set (KId, R, Int)) -> [Word]
+    spillmask d (Just s) =
+      let bits = catMaybes [maybe Nothing (nb sn) (M.lookup nm d)|(nm, _, sn) <- S.toList s]
+          maxn = if bits == [] then 0 else maximum $ map fst bits
+          bitv = M.elems $ M.fromListWith (flip setBit) ([(i,0)|i<-[0..maxn]] ++ bits)
+--      in trace "BITS" $ trace (show bits) $  trace (show bitv) $ (map fromIntegral bitv)
+      in map fromIntegral bitv
+      where nb n t | isPtr t = Just (n `div` regNum, n `mod` regNum)
+                   | otherwise = Nothing
+
+    spillmask _ Nothing = [0]
+
+regNum = length (R.allRegs :: [R])
+
+slotCellNum n =  n `div` regNum + (if n `mod` regNum /= 0 then 1 else 0)
 
 isPtr :: HType -> Bool
 isPtr (TFun _ _ _) = True
+isPtr TStr  = True
 isPtr _ = False
 
 
@@ -407,7 +444,7 @@ data CWriterEnv = CWriterEnv { entrypoints :: M.Map KId Label
                              , spillTagRefs :: M.Map KId Int
                              }
 
-data TagRecord = TagRecord { tagSize :: Int } deriving (Eq, Ord)
+data TagRecord = TagRecord { tagSize :: Int, tagMask :: [Word] } deriving (Eq, Ord)
 
 runCWriterM :: CWriterEnv -> CWriterM a -> CompileM [String]
 runCWriterM env m = runReaderT (execWriterT (evalStateT m 0)) env
