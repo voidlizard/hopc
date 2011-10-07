@@ -62,6 +62,7 @@ main = do
           constr <- KT.constraints k'
           constr' <- I.inferM (constr++constr2)
           addEntries False (map (\(a,b) -> (typeid a, b)) constr')
+
           k'' <- return k'  >>= Cn.propagate
                             >>= B.betaReduceM
                             >>= L.flattenM
@@ -71,6 +72,9 @@ main = do
 
           procs <- FC.convert c1
           dict <- getEntries
+      
+          trace ( intercalate "\n" (map show (M.toList dict))) $ return ()
+
           ep <- getEntryPoint >>= return.fromJust
           vm <- forM procs $ \p@(I.Proc {I.name = n, I.body = g, I.entry = e}) -> do
                   live <- lift $ L.live e g
@@ -83,8 +87,8 @@ main = do
 --                  trace ("Spilled " ++ n) $ trace (show (V.spill alloc)) $ return ()
                   lift $ fromIR dict live alloc p
           code <- W.write ep vm
---          return $ [RCCode code]
-          return $ [RKTree k'', RClos c1', RClos c1, RVm vm, RCCode code]
+          return $ [RCCode code]
+--          return $ [RKTree k'', RClos c1', RClos c1, RVm vm]
 --          return $ [RKTree k'', RClos c1', RClos c1, RVm vm, RCCode code]
 --          return $ [RKTree k'', RClos c1, RVm vm, RCCode code]
 --          return $ RClos c1

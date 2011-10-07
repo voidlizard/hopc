@@ -15,7 +15,7 @@
 
 ($ typeof main ((:unit) :unit) $)
 
-(define (main) 
+(define (main)
 
   ((func1) "C")
   (display "\n")

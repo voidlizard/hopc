@@ -14,6 +14,7 @@ import Compilers.Hopc.Frontend.KTree
 import Compilers.Hopc.Frontend.Types
 
 import Debug.Trace
+import Text.Printf
 
 type KTypedM = StateT (M.Map KId HType) CompileM
 
@@ -21,10 +22,33 @@ constraints :: KTree -> CompileM [(HType, HType)]
 constraints k = do
    
     dict <- getEntries
-    c <- evalStateT (mapM constr (universe k)) (init dict)
-    return $ concat c 
+    c <- flip evalStateT (init dict) $ do
+      constr' <- mapM constr (universe k)
+      let constr = concat constr'
+      let frt = M.fromList $ foldl fr [] constr
+      forM constr $ \(a, b) -> do
+        a' <- repl frt a
+        b' <- repl frt b
+        return (a', b')
 
-    where constr :: KTree -> KTypedM [(HType, HType)]
+    trace (intercalate "\n" $ (map show c)) $ return ()
+
+    return c
+
+    where 
+  
+          repl :: M.Map HType HType -> HType -> KTypedM HType
+          repl d x@(TFun t a r) = do
+            a' <- mapM (repl d) a
+            r'  <- repl d r
+            return $ TFun t a' r'
+
+          repl d x = return $ maybe x id (M.lookup x d)
+
+          fr acc (TVar n, TFun _ _ rt) = (TAppl n, rt) : acc
+          fr acc _ = acc
+
+          constr :: KTree -> KTypedM [(HType, HType)]
 
           constr (KLet n e1 _) = do
             tp <- typeOf e1
@@ -37,16 +61,18 @@ constraints k = do
                 mem n tp
                 return $ (TVar n, tp)
 
-          constr (KLambda args _) = do
+          constr (KLambda args e) = do
             forM_ args $ \n -> mem n (TVar n)
             return []
 
           constr (KApp n e) = do
             fn <- remem' n
             wtf <- get
+            let at = map TVar e
+            rtype <- newTypeVar
             case fn of
                 Just (TFun _ at rt) -> return $ zipWith (\a b -> (TVar a, b)) e at
-                Just x -> return [] -- error $ "NOT APPLICABLE " ++ show x ++ "\n" ++ intercalate "\n" (map show (M.toList wtf))
+                Just x  -> return $ [(TVar n, TFun TFunLocal at (TVar rtype))]
                 Nothing -> return []
 
           constr (KCond n e1 e2) = do
@@ -58,6 +84,8 @@ constraints k = do
           constr x = return []
 
           init x = x
+
+          newTypeVar = lift $ nextTmp >>= return . ((++)"typevar_") . show
 
           mem :: KId -> HType -> KTypedM ()
           mem n t = modify (M.insert n t) 
@@ -89,12 +117,11 @@ constraints k = do
 
           typeOf (KApp n args) = do
             st <- get
-
             tp <- remem' n
-            return $ case tp of
-                        Nothing -> TAppl n
-                        Just (TFun _ _ rt)  -> rt
-                        x       -> error $ "NOT APPLICABLE  "  ++ n
+            case tp of
+              Nothing -> return $ TAppl n --  liftM TVar newTypeVar
+              Just (TFun _ _ rt)  -> return rt
+              x       -> return $ TAppl n --error $ "NOT APPLICABLE  "  ++ n ++ " " ++ (show x)
 
           typeOf (KCond _ e1 e2) = typeOf e1 
 

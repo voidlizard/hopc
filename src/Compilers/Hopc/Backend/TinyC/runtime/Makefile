@@ -1,4 +1,4 @@
 all:
-	gcc -Wall -I . ./main.c ./hopcruntime.c -o main
+	gcc -g -I . ./main.c ./hopcruntime.c -o main
 
 

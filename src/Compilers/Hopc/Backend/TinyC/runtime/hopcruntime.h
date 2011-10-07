@@ -109,6 +109,7 @@ hcell *hopc_gc_chunk_start(hopc_runtime *r, hcell *p);
 hword_t hopc_gc_maxmem(hopc_runtime *r); 
 hword_t hopc_gc_freemem(hopc_runtime *r);
 hword_t hopc_gc_chunksize(hopc_runtime *r, memchunk *p);
+memchunk* hopc_gc_prev_chunk(hopc_runtime *r, memchunk *p);
 
 void hopc_gc_mark_root_alive(hopc_runtime *runtime, memchunk *chunk);
 
@@ -131,5 +132,7 @@ hcell hopc_unspill(hopc_runtime *r, hword_t slot);
 void hopc_out_of_mem_hook(hopc_runtime*);
 
 #define BITGET(t, n) ((t)&(1<<(n)))
+
+void dump_heap3(hopc_runtime *runtime); 
 
 #endif

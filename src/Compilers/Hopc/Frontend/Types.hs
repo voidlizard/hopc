@@ -8,6 +8,7 @@ import Compilers.Hopc.Id (KId)
 import Compilers.Hopc.Typing.Types
 
 import Debug.Trace
+import Text.Printf
 
 data TFunSpec = TFunForeign KId | TFunLocal deriving (Eq, Show, Ord, Data, Typeable)
 
@@ -28,7 +29,7 @@ instance TType HType  where
     subst ta a x@(TVar s) = if ta == s then a else x
     subst ta a (TFun s args r) = TFun s (substList ta a args) (subst ta a r)
 
-    subst ta a x@(TAppl s) = if ta == s then a else x
+--    subst ta a x@(TAppl s) = trace ("SUBST " ++ show (ta,a,x)) $ if ta == s then a else x
 
     subst ta a x = x
 
@@ -37,14 +38,13 @@ instance TType HType  where
     isVar (TAny _)  = True
     isVar x         = False
 
-    merge (TFun _ args1 r1) (TFun _ args2 r2) = Just $ (zip args1 args2) ++ [(r1, r2)]
+    merge x@(TFun _ args1 r1) y@(TFun _ args2 r2) = Just $ (zip args1 args2) ++ [(r1, r2)] -- FIXME: what if different num of variables?
     merge x y = Nothing
 
     typeid (TVar  s)  = s
     typeid (TAny  s)  = s
-    typeid (TAppl s)  = s
+    typeid (TAppl s)  = "appl_" ++ s
     typeid x         = "unknown"
-
 
 isVarT :: HType -> Bool
 isVarT (TVar _) = True

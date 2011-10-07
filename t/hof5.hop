@@ -1,0 +1,18 @@
+($ foreign "display" display ((:string) :unit) $)
+($ foreign "newline" newline ((:unit) :unit)   $)
+
+(define (q s) (display s))
+
+($ typeof f1 ((((:string) :unit) ((:string) :unit)) :unit) $)
+
+(define (f1 fput fput2)
+    (q)
+    (fput "PIU")
+    (q)
+    (fput2 "PIU")
+)
+
+(f1 q)
+
+
+

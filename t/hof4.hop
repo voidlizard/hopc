@@ -3,6 +3,8 @@
 
 ;;#lang scheme
 
+(define (print s) (display s))
+
 (define (pysh)
   (display "BOO")
   (newline)
@@ -20,11 +22,14 @@
   (newline)
 )
 
-(define (f1 fput) (fput "PIU"))
+;; ($ typeof f1  (( ((:string) :unit) ) :unit)   $)
+
+(define (f1 fput)
+    (fput "PIU")
+;    (print "F1")
+)
 
 (define (qq a) (pysh))
-
-(qq)
 
 (f1 piu)
 

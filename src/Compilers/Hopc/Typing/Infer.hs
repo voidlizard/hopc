@@ -33,7 +33,7 @@ let unify constr =
 inferM :: (Eq a, TType a) => [(a, a)] -> CompileM [(a, a)]
 inferM constr = withError $ infer constr
     where withError (Right x) = return x
-          withError (Left _)  = throwError TypingError -- FIXME: more error handling
+          withError (Left x)  = throwError TypingError -- FIXME: more error handling
 
 
 infer :: (Eq a, TType a) => [(a, a)] -> Either (InferError a) [(a, a)]
@@ -46,7 +46,7 @@ uni :: (Eq a, TType a) => Either (InferError a) [(a, a)] -> Either (InferError a
 
 uni (Right []) = Right []
 uni (Right ((a,b):rs)) | a == b = uni $ Right rs
-                       | isVar a = if occurs (typeid a) b 
+                       | isVar a = if occurs (typeid a) b
                                      then Left (Occurs a b)
                                      else result (a, b) (uni $ Right $ map (sub (typeid a) b) rs)
                        | (not.isVar) a && isVar b = uni $ Right ((b,a):rs)

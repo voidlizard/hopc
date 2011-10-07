@@ -76,7 +76,7 @@ write ep p = do
 
       indent $ "const hopc_tagdata tagdata[] = {"
       shift $ " {CELLS(sizeof(hopc_task)), {0}}"
-      shift $ ",{CELLS(sizeof(hopc_closure)), {0}} // HOPCCLOSURETAG " 
+      shift $ ",{CELLS(sizeof(hopc_closure)), {2}} // HOPCCLOSURETAG "
 
       -- insert spill's tags
       tl <- asks spillTags
