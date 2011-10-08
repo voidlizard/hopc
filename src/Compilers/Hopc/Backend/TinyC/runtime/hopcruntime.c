@@ -420,6 +420,14 @@ void hopc_gc_mark_root_alive(hopc_runtime *runtime, memchunk *chunk) {
 }
 
 
+void hopc_debug_runtime(hopc_runtime* runtime) {
+#ifdef HOPC_DEBUG_LEVEL6
+    fprintf(stderr, "\r free memory: %8d  total memory: %8d                 ", 
+                    hopc_gc_freemem(runtime),
+                    hopc_gc_maxmem(runtime));
+#endif
+}
+
 void dump_heap3(hopc_runtime *runtime) {
     hcell *chunk = 0;
     memchunk *memc = 0;

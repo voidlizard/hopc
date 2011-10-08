@@ -133,6 +133,8 @@ void hopc_out_of_mem_hook(hopc_runtime*);
 
 #define BITGET(t, n) ((t)&(1<<(n)))
 
+void hopc_debug_runtime(hopc_runtime*);
+
 void dump_heap3(hopc_runtime *runtime); 
 
 #endif

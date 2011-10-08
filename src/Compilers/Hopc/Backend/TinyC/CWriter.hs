@@ -137,9 +137,13 @@ write ep p = do
       empty
       gotoLabel entrypointLabel
       empty
-      shift $ stmt $ printf "fprintf(stderr, \"\\nR0: %%d REGMASK: %%d\\n\", R0, runtime->taskheadp->mask)"
+--      shift $ stmt $ printf "fprintf(stderr, \"\\nR0: %%d REGMASK: %%d\\n\", W(R0), runtime->taskheadp->mask)"
+      shift $ stmt $ printf "hopc_debug_runtime(runtime)"
       shift $ printf "if( hopc_gc_freemem(runtime) < HOPC_GC_TRESHOLD(runtime) ) {"
       pushIndent
+
+      storeTaskRegs
+
       shift $ stmt $ "hopc_gc_collect(runtime)"
       popIndent
       shift $ "}"
@@ -355,6 +359,12 @@ write ep p = do
     sencode :: String -> String 
     sencode s = "{" ++ enc ++ "}"
       where enc = intercalate "," $ map (printf "0x%02X") $ length s : map ord s ++ [0]
+
+    storeTaskRegs :: CWriterM ()
+    storeTaskRegs = do
+      forM_ (zip (R.allRegs :: [R]) [(0::Int)..]) $ \(r,i) -> do
+        shift $ stmt $ printf "runtime->taskheadp->regs[%d] = %s" i (reg r)
+      empty
 
     funMap :: M.Map KId Proc
     funMap = M.fromList $ map (\(fp@(Proc{name=n})) -> (n,fp)) p

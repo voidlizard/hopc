@@ -6,13 +6,16 @@
 ($ typeof f1 ((((:string) :unit) ((:string) :unit)) :unit) $)
 
 (define (f1 fput fput2)
-    (q)
+    (q "Q")
+    (newline)
     (fput "PIU")
-    (q)
-    (fput2 "PIU")
+    (newline)
+    (q "Q")
+    (newline)
+    (fput2 "PYSH PYSH")
+    (newline)
 )
 
-(f1 q)
-
+(f1 q display)
 
 
