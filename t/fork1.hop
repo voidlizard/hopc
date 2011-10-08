@@ -1,0 +1,27 @@
+($ foreign "display" display ((:string) :unit) $)
+($ foreign "spawn" spawn (( ((:unit) :unit) ) :unit) $)
+
+(display "HELLO FORK")
+
+($ typeof thread1 ((:unit) :unit) $)
+($ typeof thread2 ((:unit) :unit) $)
+
+(define (thread1)
+  (display "PING")
+  (thread1)
+)
+
+(define (thread2)
+  (display "PONG")
+  (thread2)
+)
+
+(spawn thread1)
+(spawn thread2)
+
+(spawn
+  (lambda ()
+    (display "JOPA")
+  )
+)
+
