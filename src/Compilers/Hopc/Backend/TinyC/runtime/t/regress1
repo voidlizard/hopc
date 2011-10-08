@@ -1,0 +1,33 @@
+initialized a tuple to survive the gc 006032D0
+0000DEAD
+0000BEEF
+0000CAFE
+0000DEAD
+0000BEEF
+0000CAFE
+0000DEAD
+0000BEEF
+0000CAFE
+hcell size: 8 1
+hopc_task: 160 20
+HOPC_AR_HEAD: 2
+hopc_closure: 16 2
+; top: 0x00603100 end: 0x00605100, total: 0, free: 1024
+; 0x00603378 alive 20 21 0000
+; 0x006032D0 dead 3 4 0003
+; 0x006032B0 alive 20 21 0000
+; 0x00603208 dead 2 3 0002
+; 0x006031F0 dead 4 5 0004
+; 0x006031C8 alive 20 21 0000
+; 0x00603120 dead 4 5 0004
+; top: 0x00603380 end: 0x00605100, total: 80, free: 944
+; 0x00603310 dead 20 21 0000
+; 0x00603268 dead 3 4 0003
+; 0x00603248 dead 20 21 0000
+; 0x006031A0 dead 20 21 0000
+; top: 0x00603318 end: 0x00605100, total: 80, free: 957
+; 0x00603310 dead 20 21 0000
+; 0x00603268 dead 3 4 0003
+; 0x00603248 dead 20 21 0000
+; 0x006031A0 dead 20 21 0000
+; top: 0x00603318 end: 0x00605100, total: 80, free: 957

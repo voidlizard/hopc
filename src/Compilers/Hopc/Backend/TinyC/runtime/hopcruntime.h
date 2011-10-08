@@ -78,6 +78,7 @@ typedef struct __task {
 typedef struct {
     hopc_gc gc;
     hopc_task *taskheadp;
+    hopc_task *tasktailp;
     hword_t taskid;
     const hopc_tagdata *tagdata;
 } hopc_runtime;

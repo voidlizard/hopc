@@ -1,5 +1,7 @@
 ($ foreign "display" display ((:string) :unit) $)
 ($ foreign "spawn" spawn (( ((:unit) :unit) ) :unit) $)
+($ foreign "yield" yield ((:unit) :unit) $)
+($ foreign "newline" newline ((:unit) :unit)   $)
 
 (display "HELLO FORK")
 
@@ -8,11 +10,15 @@
 
 (define (thread1)
   (display "PING")
+  (newline)
+  (yield)
   (thread1)
 )
 
 (define (thread2)
   (display "PONG")
+  (newline)
+  (yield)
   (thread2)
 )
 
@@ -21,7 +27,8 @@
 
 (spawn
   (lambda ()
-    (display "JOPA")
+    (display "MEMEME")
+    (newline)
   )
 )
 

@@ -45,6 +45,7 @@ void hopc_gc_init(hopc_gc *gc, hcell *mem, hword_t size) {
 void hopc_init_runtime(hopc_runtime *runtime, hcell *mem, hword_t size) {
     hopc_gc_init(&(runtime->gc), mem, size);
     runtime->taskheadp = 0;
+    runtime->tasktailp = 0;
     runtime->taskid = 0;
 }
 
@@ -107,21 +108,32 @@ hopc_task *hopc_insert_task(hopc_runtime *runtime) {
     t->arhead = 0;
     memset(t->regs, 0, sizeof(hcell)*HOPCREGNUM);
     t->mask = 0;
+
+    if( !runtime->tasktailp ) {
+      runtime->tasktailp = t;
+    }
+
     return t;
 }
 
 void hopc_delete_task(hopc_runtime *runtime, hword_t id) {
     hopc_task *p = runtime->taskheadp;
     hopc_task *t = hopc_find_task(runtime, id);
-    
+
     if( t == runtime->taskheadp ) {
         runtime->taskheadp = t->next;
-        return;
+    } else {
+      for(; t && p && p->next != t ; p = p->next );
+      if( p && p->next == t ) {
+          p->next = t->next;
+      }
     }
 
-    for(; t && p && p->next != t ; p = p->next );
-    if( p && p->next == t ) {
-        p->next = t->next;
+    for( p = runtime->taskheadp; p; p = p->next ) {
+      if( !p->next ) {
+        runtime->tasktailp = p;
+        break;
+      }
     }
 }
 
@@ -134,7 +146,6 @@ memchunk *hopc_make_activation_record(hopc_runtime *runtime, htag tag) {
     ((memchunk*)chunk)->t.gc_follow = 1;
     return (memchunk*)chunk;
 }
-
 
 hopc_ar *hopc_push_activation_record2(hopc_runtime *runtime, memchunk *chunk) {
     hopc_ar *arp = (hopc_ar*)hopc_gc_chunk_start(runtime, (hcell*)chunk);
@@ -434,7 +445,7 @@ void dump_heap3(hopc_runtime *runtime) {
     for(chunk = runtime->gc.top - 1; chunk >= runtime->gc.heapstart_p;
                                      chunk = (hcell*)hopc_gc_prev_chunk(runtime, memc)) {
         memc = (memchunk*)chunk;
-        printf("; 0x%08X %s %d %d %04X\n", chunk, 
+        printf("; 0x%08X %s %d %d %04X\n", chunk,
                                            (memc->t.gc_alive?"alive":"dead"),
                                            hopc_tagsize(runtime, memc->t.tag),
                                            hopc_gc_chunksize(runtime, memc),

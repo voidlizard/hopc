@@ -49,7 +49,7 @@
 	  (display x20)
 	  (display x21)
 	  (display x22)
-	  (display x23)
+	  ; (display x23)
 	  (display x24)
 	  (display x25)
 	  (display x26)
