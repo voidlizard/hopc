@@ -504,8 +504,8 @@ varType n rdict =
      else fromJust tp
 
 callvar :: I.CallT -> KId
-callvar (I.Closure n _) = n
-callvar (I.Direct n _)  = n
+callvar (I.Closure n _) = trace (printf "closure: callvar %s" n) $ n
+callvar (I.Direct n _)  = trace (printf "direct:  callvar %s" n) $ n
 
 data REnv = REnv { regalloc :: RegAllocation
                  , rdict :: TDict

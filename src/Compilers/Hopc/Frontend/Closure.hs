@@ -77,18 +77,30 @@ conv2 k' = do
     let fv2 n k = k 
     let g n = S.member n glob
 
-    q <- forM (M.toList (cfn s)) $ \(n, l@(KLambda args b)) -> do
+    (q, oldn) <- liftM unzip $ forM (M.toList (cfn s)) $ \(n, l@(KLambda args b)) -> do
         (b, s) <- runStateT (p b) $ finit
         let fn = CFun (Fun (fname n) args (f n) b)
-        return (fname n, fn)
+        return ((fname n, fn), (fname n, n))
 
     let bmap = M.fromList q
+    let oldmap = M.fromList oldn
 
     let fb n = maybe Nothing (\(CFun f) -> Just f) (M.lookup n bmap)
 
     let cl = addFns v q
 
-    let bs = [n | (CMakeCls n args) <- universe cl]
+--    [CLetR ()]
+
+    bs <- liftM (catMaybes . (map (flip M.lookup oldmap)) . snd) $ runWriterT $ do
+      forM_ [n|(CLet _ (CFun (Fun n _ _ _)) _) <- universe cl] $ tell . (:[])
+      forM_ [b|(CLetR b _) <- universe cl] $ mapM_ $ \(n,e) ->
+        case e of
+          (CFun (Fun n _ _ _)) -> tell [n] >> return ()
+          _ -> return ()
+
+--    trace "GOT FUNCTIONS" $ trace (show bs) $
+--      error "STOP"
+
     let rl = M.fromList $ map (\a -> (a, fname a)) $ S.toList $ S.fromList bs `S.difference` glob
     let rl' = M.fromList $ map (\(a,b) -> (b,a)) $ M.toList rl
 
@@ -97,13 +109,15 @@ conv2 k' = do
     (cl', s) <- runStateT (rewriteBiM (r (C3 f g fb rn fv2 )) cl) (M.empty)
 
     let fs2 = M.fromList $ [(f, p) | CFun p@(Fun f args free bdy) <- universe cl']
-    let f2  n = maybe [] (\(Fun _ _ f _) -> f) (M.lookup n fs2)
+    let f2  n = maybe [] (\(Fun _ a f _) -> f) (M.lookup n fs2)
     let fb2 n = M.lookup n fs2
     let flt n k = f2 n
 
     let nr n = M.lookup n rl'
 --    let fss n = maybe [] id (f2 n)
-    let ct = rewriteBi (rself flt nr f2) cl'
+--    let ct = rewriteBi (rself flt nr f2) cl'
+    ct <- evalStateT (rewriteBiM (rself flt nr f2) cl') Nothing
+--    let ct = cl' 
 
     (cl'', s) <- runStateT (rewriteBiM (r (C3 f2 g fb2 rn flt)) ct) (M.empty)
 
@@ -216,14 +230,14 @@ conv2 k' = do
 
           r c x = return Nothing
 
-          rself :: (KId -> [KId] -> [KId]) -> (KId -> Maybe KId) -> (KId -> [KId]) -> Closure -> Maybe Closure
+          rself :: (KId -> [KId] -> [KId]) -> (KId -> Maybe KId) -> (KId -> [KId]) -> Closure -> (StateT (Maybe KId) CompileM) (Maybe Closure)
           rself flt nr fv (CApplCls n args) =
             let nm = nr (fname n)
             in case nm of
-                Just x | x == n -> Just $ CApplDir (fname n) $ args ++ (flt n (fv (fname n)))
-                _ -> Nothing
+                Just x | x == n -> trace (printf "convert fun %s" n) $ return $ Just $ CApplDir (fname n) $ args ++ (flt n (fv (fname n)))
+                _ -> return Nothing
 
-          rself _ _ _ _ = Nothing
+          rself _ _ _ _ = return Nothing
 
           alive c = para a c
 

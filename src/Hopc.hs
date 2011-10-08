@@ -72,9 +72,8 @@ main = do
 
           procs <- FC.convert c1
           dict <- getEntries
-      
-          trace ( intercalate "\n" (map show (M.toList dict))) $ return ()
 
+          trace ( intercalate "\n" (map show (M.toList dict))) $ return ()
           ep <- getEntryPoint >>= return.fromJust
           vm <- forM procs $ \p@(I.Proc {I.name = n, I.body = g, I.entry = e}) -> do
                   live <- lift $ L.live e g
@@ -88,7 +87,8 @@ main = do
                   lift $ fromIR dict live alloc p
           code <- W.write ep vm
           return $ [RCCode code]
---          return $ [RKTree k'', RClos c1', RClos c1, RVm vm]
+--          return $ [RKTree k'', RClos c1', RClos c1, RVm vm, RCCode code]
+--          return $ [RKTree k'', RClos c1', RClos c1] -- , RVm vm]
 --          return $ [RKTree k'', RClos c1', RClos c1, RVm vm, RCCode code]
 --          return $ [RKTree k'', RClos c1, RVm vm, RCCode code]
 --          return $ RClos c1
