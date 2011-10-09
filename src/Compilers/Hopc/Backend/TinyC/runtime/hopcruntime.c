@@ -116,6 +116,13 @@ hopc_task *hopc_insert_task(hopc_runtime *runtime) {
     return t;
 }
 
+void hopc_detach_task(hopc_runtime *runtime) {
+  if( runtime->taskheadp ) {
+    runtime->taskheadp = runtime->taskheadp->next;
+  }
+/*  fprintf(stderr, "detached: %08X\n", runtime->taskheadp); */
+}
+
 void hopc_delete_task(hopc_runtime *runtime, hword_t id) {
     hopc_task *p = runtime->taskheadp;
     hopc_task *t = hopc_find_task(runtime, id);
@@ -140,13 +147,23 @@ void hopc_delete_task(hopc_runtime *runtime, hword_t id) {
 void hopc_switch_task(hopc_runtime *runtime, htime_t delta) {
     hopc_task *tp;
     if( runtime->taskheadp && runtime->tasktailp != runtime->taskheadp ) {
-        fprintf(stderr, "DO SWITCH TASK\n");
+/*        fprintf(stderr, "DO SWITCH TASK\n");*/
         tp = runtime->taskheadp;
         runtime->taskheadp = runtime->taskheadp->next;
         runtime->tasktailp->next = tp;
         tp->next = 0;
         runtime->tasktailp = tp;
+/*        fprintf(stderr, "TASK SWITCHED: %08X R0: %d\n", runtime->taskheadp, W(runtime->taskheadp->regs[0]));*/
     }
+}
+
+// hcell --- closure
+void hopc_spawn_task(hopc_runtime *runtime, hcell cell) {
+  hopc_task *tp = hopc_insert_task(runtime);
+  hopc_closure *cp = (hopc_closure*)hopc_gc_chunk_start(runtime, (hcell*)P(cell));
+  tp->regs[0] = cp->cp;
+  tp->arhead = (hopc_ar*)hopc_gc_chunk_start(runtime, (hcell*)P(cp->ar));
+/*  fprintf(stderr, "SPAWN %08X R0: %d\n", tp, W(tp->regs[0]));*/
 }
 
 memchunk *hopc_make_activation_record(hopc_runtime *runtime, htag tag) {
@@ -193,6 +210,13 @@ hcell *hopc_make_closure(hopc_runtime *runtime, hword_t label, hcell *archunk, h
     closp->ar.p = (hword_t*)archunk;
 /*    printf("make closure cp: %d %08X t:%04X t1:%04X %08X / ar %08X\n", closp->cp, closp, tag, ((memchunk*)chunk)->t.tag, chunk, closp->ar);*/
     return chunk;
+}
+
+void hopc_fix_closure(hopc_runtime *runtime, hword_t label, hcell *chunk) {
+    hopc_closure *closp = (hopc_closure*)hopc_gc_chunk_start(runtime, chunk);
+    hopc_ar *arp = hopc_gc_chunk_start(runtime, (hcell*)closp->ar.p);
+/*    fprintf(stderr, "FIXING CLOSURE: %d\n", label);*/
+    arp->slots[0].w = label;
 }
 
 void hopc_spill(hopc_runtime *r, hword_t slot, hcell data) {

@@ -134,7 +134,13 @@ knorm (EMacroT o atomt ttype c) = do
 
 knorm (EMacroFrn o str atomt ttypefun c) = do
     let n = ofatom atomt
-    let t = kTypeofFn (Just str) ttypefun
+    let t = kTypeofFn False (Just str) ttypefun
+    lift $ addEntry True n t
+    return KUnit
+
+knorm (EMacroFrnP o str atomt ttypefun c) = do
+    let n = ofatom atomt
+    let t = kTypeofFn True (Just str) ttypefun
     lift $ addEntry True n t
     return KUnit
 
@@ -205,21 +211,21 @@ kTypeof :: TType -> HType
 
 kTypeof (ETypeAtom atomt) = (typeofstr.ofatom) atomt
 
-kTypeof (ETypeFun tf) = kTypeofFn Nothing tf
+kTypeof (ETypeFun tf) = kTypeofFn False Nothing tf
 
 kTypeof _ = error "BAD TYPE DECL" -- FIXME
 
-kTypeofFn :: Maybe String -> TTypeFun -> HType 
+kTypeofFn :: Bool -> Maybe String -> TTypeFun -> HType 
 
-kTypeofFn native (ETypeFunDecl o (ETypeList _ ttypes _) ttype c) = 
+kTypeofFn pure native (ETypeFunDecl o (ETypeList _ ttypes _) ttype c) = 
     let at = map kTypeof ttypes
         rt = kTypeof ttype
         ft = case native of
                Nothing -> TFunLocal
-               Just n  -> TFunForeign True n -- FIXME: all functions are considered pure
+               Just n  -> TFunForeign pure n
     in TFun ft at rt
 
-kTypeofFn _ _ = error "BAD TYPE DECL" -- FIXME
+kTypeofFn _ _ _ = error "BAD TYPE DECL" -- FIXME
 
 typeofstr ":unit"   = TUnit
 typeofstr ":string" = TStr

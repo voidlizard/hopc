@@ -1,4 +1,4 @@
-($ foreign "display" display ((:string) :unit) $)
+($ foreign pure "display" display ((:string) :unit) $)
 
 (define (fa) "A")
 (define (fb) "B")

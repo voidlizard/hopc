@@ -15,6 +15,7 @@ ECond.   Exp ::= O "if" Exp Exp Exp C;
 
 EMacroT.   Exp ::=  O "$" "typeof"   AtomT TType "$" C;
 EMacroFrn. Exp ::=  O "$" "foreign"  String AtomT TTypeFun "$" C;
+EMacroFrnP. Exp ::= O "$" "foreign" "pure" String AtomT TTypeFun "$" C;
 
 EBind.   Bind ::= O AtomT Exp C;
 EDef.    Exp  ::= Def;

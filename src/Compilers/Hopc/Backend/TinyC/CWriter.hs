@@ -30,10 +30,15 @@ import Debug.Trace
 
 write :: KId -> [Proc] -> CompileM [String]
 write ep p = do
+      dict <- getEntries
+      l <- lift $ freshLabel
+
+      trace ("EXIT LABEL  " ++ show l) $ return ()
+
       (tl, tref) <- uniqSpillTagMap (closureTag+1)
-      runCWriterM (envInit tl tref) $ do
+      runCWriterM (envInit l dict tl tref) $ do
         prologue
-        entrypoint $ forM_ p $ \p -> do
+        entrypoint l $ forM_ p $ \p -> do
           comment (name p)
           comment $ printf "arity: %d  freevars: %d" (arity p) (freevarsnum p)
           forM_ (body p) (opcode p)
@@ -125,14 +130,22 @@ write ep p = do
       popIndent 
       indent $ "}"
 
-    entrypoint :: CWriterM () -> CWriterM () 
-    entrypoint m = do
+    entrypoint :: Label -> CWriterM () -> CWriterM () 
+    entrypoint exitL m = do
       indent "void hopc_entrypoint(hopc_runtime *runtime) {"
       shift $ stmt $ "htime_t tasktime = HOPCTASKQT, lasttime = 0, delta = 0"
-      shift $ stmt $ regType ++ " " ++ intercalate ", " (map reg R.allRegs)
+      shift $ stmt $ regType ++ " " ++ intercalate ", " ("RS" : map reg R.allRegs)
       empty
       lep <- funEntry ep
       shift $ goto lep
+      empty
+      gotoLabel "spawn"
+      pushIndent
+      storeTaskRegs
+      shift $ stmt $ "hopc_spawn_task(runtime, RS)"
+      restoreTaskRegs
+      shift $ stmt $ printf "tasktime = HOPCTASKQT"
+      popIndent
       empty
       gotoLabel entrypointLabel
       empty
@@ -152,9 +165,11 @@ write ep p = do
       shift $ stmt $ printf "tasktime = delta < tasktime ? tasktime - delta : 0"
       shift $ "if( !tasktime ) {"
       pushIndent
-      shift $ stmt $ "fprintf(stderr, \"IT'S CONTEXT SWITCHING TIME!\\n\")"
+--      shift $ stmt $ "fprintf(stderr, \"IT'S CONTEXT SWITCHING TIME!\\n\")"
       storeTaskRegs
       shift $ stmt $ "hopc_switch_task(runtime, delta)"
+      empty
+      restoreTaskRegs
       shift $ stmt $ printf "tasktime = HOPCTASKQT"
       popIndent
       shift $ "}" 
@@ -166,7 +181,20 @@ write ep p = do
       pushIndent
       m
       gotoLabel exitpointLabel
-      indent $ stmt $ "default: break"
+      caseLabel exitL
+      indent $ "default:"
+      shift $ stmt "hopc_detach_task(runtime)"
+      shift $ "if(!runtime->taskheadp)"
+      pushIndent
+      shift $ stmt "break"
+      popIndent
+      shift $ "else {"
+      pushIndent
+      restoreTaskRegs
+      shift $ stmt "tasktime=HOPCTASKQT"
+      shift $ goto' entrypointLabel
+      popIndent
+      shift $ "}"
       popIndent
       indent "}"
       popIndent
@@ -222,19 +250,33 @@ write ep p = do
     caseLabel :: Label -> CWriterM ()
     caseLabel n = do
       cp <- asks checkpoints >>= return . M.member n
+      cp' <- asks checkpoints
       when cp $ indent $ "case " ++ decorateCaseLbl (show n) ++ ":"
 
     args :: [R] -> String
     args rs = intercalate ", " $ map reg rs
     
-    args' = map reg
+    args' (Just (TFun (TFunForeign False _) _ _)) x = "runtime" : map reg x
+    args' _ x = map reg x
 
-    foreign :: KId -> RT -> [R] -> CWriterM ()
-    foreign n (RReg r) rs =
-      shift $ stmt $ printf "W(%s) = HOPC_CALLFFI(%s)" (reg r) (intercalate "," (n:args' rs))
+    foreign :: Label -> KId -> RT -> [R] -> CWriterM ()
+    foreign l n (RReg r) rs = do
+      tp <- liftCompileM $ getEntryType n
+      shift $ stmt $ printf "W(%s) = HOPC_CALLFFI(%s)" (reg r) (intercalate "," (n:args' tp rs))
+      foreignYield tp l
 
-    foreign n (RVoid) rs =
-      shift $ stmt $ printf "HOPC_CALLFFI(%s)" (intercalate "," (n:args' rs))
+    foreign l n (RVoid) rs = do
+      tp <- liftCompileM $ getEntryType n
+      shift $ stmt $ printf "HOPC_CALLFFI(%s)" (intercalate "," (n:args' tp rs))
+      foreignYield tp l
+
+    foreignYield :: Maybe HType -> Label -> CWriterM ()
+    foreignYield (Just (TFun (TFunForeign False _) _ _)) l = do
+      cp <- asks (fromJust . M.lookup l . checkpoints) -- FIXME: must work, but ugly
+      shift $ stmt $ printf "W(R0) = %s" (decorateCaseLbl (show l))
+      shift $ goto' entrypointLabel
+
+    foreignYield _ _ = nothing
 
     activationRecord :: Proc -> CWriterM ()
     activationRecord p | (slotnum p) > 0 = do
@@ -296,9 +338,19 @@ write ep p = do
       shift $ goto lbl 
       empty
 
-    opcode _ (CallF _ n  rs r) = do
+    opcode _ (CallF l "spawn"  rs r) = do
+      let cl = decorateCaseLbl (show l)
+      let rcp = ((reg . head) rs)
+      lxcp <- asks exitpointCp -- >>= \n -> asks (fromJust . M.lookup n . checkpoints)
+      shiftIndent $ comment $ "SPAWN "  ++ (decorateCaseLbl (show lxcp))
+      shift $ stmt $ printf "hopc_fix_closure(runtime, %s, (hcell*)P(%s))" (decorateCaseLbl (show lxcp)) rcp
+      shift $ stmt $ printf "W(R0) = %s" (decorateCaseLbl (show l))
+      shift $ stmt $ printf "RS = %s" rcp
+      shift $ goto' "spawn"
+
+    opcode _ (CallF l n  rs r) = do
       shiftIndent $ comment $ "foreign call " ++ n 
-      foreign n r rs
+      foreign l n r rs
 
     opcode _ (CallC l rc rs _) = do
       let cl = decorateCaseLbl (show l)
@@ -379,6 +431,12 @@ write ep p = do
         shift $ stmt $ printf "runtime->taskheadp->regs[%d] = %s" i (reg r)
       empty
 
+    restoreTaskRegs :: CWriterM ()
+    restoreTaskRegs = do
+      forM_ (zip (R.allRegs :: [R]) [(0::Int)..]) $ \(r,i) -> do
+        shift $ stmt $ printf "%s = runtime->taskheadp->regs[%d]" (reg r) i
+      empty
+
     funMap :: M.Map KId Proc
     funMap = M.fromList $ map (\(fp@(Proc{name=n})) -> (n,fp)) p
 
@@ -401,18 +459,20 @@ write ep p = do
 --      trace "entrypointsMap" $ trace (intercalate "\n" (map (const "QQ") p)) $
       M.fromList $ map (\p@(Proc{name=fn, entrypoint=l}) -> (fn, l)) p
 
-    envInit r t = CWriterEnv entrypointsMap (checkpointsMap entrypointsMap) sconsts r t
+    envInit l d r t = CWriterEnv entrypointsMap (checkpointsMap l d entrypointsMap) sconsts r t l
 
-    checkpointsMap eps =
-      let labels = foldl labelOf [] $ concatMap body p
-          refs   = S.fromList $ foldl ref [] $ concatMap body p
+    checkpointsMap lx dict eps =
+      let labels = foldl labelOf [lx] $ concatMap body p
+          refs   = S.fromList $ foldl ref [lx] $ concatMap body p
       in M.fromList $ zip (filter (flip S.member refs) labels) [0..]
       where labelOf acc (Label l) = acc ++ [l]
             labelOf acc _ = acc
             ref acc (MkClos n _ _) = acc ++ [fromJust $ M.lookup n eps]
             ref acc (CallL l _ _ _) = acc ++ [l]
             ref acc (CallC l _ _ _) = acc ++ [l]
---            ref acc (CallF l _ _ _) = acc ++ [l]
+            ref acc (CallF l n _ _)  = case (M.lookup n dict) of
+              (Just (TFun (TFunForeign False _) _ _)) -> acc ++ [l]
+              _ -> acc
             ref acc _ = acc
 
     sconsts = 
@@ -467,10 +527,13 @@ data CWriterEnv = CWriterEnv { entrypoints :: M.Map KId Label
                              , strings :: M.Map String String
                              , spillTags :: [(Int, TagRecord)]
                              , spillTagRefs :: M.Map KId Int
+                             , exitpointCp :: Label
                              }
 
 data TagRecord = TagRecord { tagSize :: Int, tagMask :: [Word] } deriving (Eq, Ord)
 
 runCWriterM :: CWriterEnv -> CWriterM a -> CompileM [String]
 runCWriterM env m = runReaderT (execWriterT (evalStateT m 0)) env
+
+liftCompileM = lift . lift . lift
 

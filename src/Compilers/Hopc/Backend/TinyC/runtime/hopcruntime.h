@@ -24,7 +24,7 @@ typedef hword_t htag;
 
 #define HOPCTIMEDIV 1000
 
-#define HOPCTASKQT 1000
+#define HOPCTASKQT 100000
 
 #define HOPCMAXRECORDFIELDS 64 // TODO: remove hardcode
 
@@ -123,6 +123,11 @@ hopc_task *hopc_find_task(hopc_runtime *runtime, hword_t id);
 hopc_task *hopc_insert_task(hopc_runtime *runtime);
 void hopc_delete_task(hopc_runtime *runtime, hword_t id);
 void hopc_switch_task(hopc_runtime *runtime, htime_t delta);
+void hopc_spawn_task(hopc_runtime*, hcell);
+void hopc_detach_task(hopc_runtime *runtime);
+
+#define hopc_ffi__yield(r)  (tasktime=0)
+#define hopc_ffi__spawn(r,c) {RS=(c);goto spawn;}
 
 hword_t hopc_tagsize(hopc_runtime *r, htag tag); 
 
@@ -133,6 +138,7 @@ void hopc_pop_activation_record(hopc_runtime *r);
 
 void hopc_spill_ar(hopc_runtime *r, hcell *chunk, hword_t slot, hcell data);
 hcell *hopc_make_closure(hopc_runtime *runtime, hword_t label, hcell *archunk, htag tag);
+void hopc_fix_closure(hopc_runtime *runtime, hword_t label, hcell *chunk);
 void hopc_spill(hopc_runtime *r, hword_t slot, hcell data);
 hcell hopc_unspill(hopc_runtime *r, hword_t slot);
 

@@ -1,14 +1,17 @@
-($ foreign "display" display ((:string) :unit) $)
+($ foreign pure "display" display ((:string) :unit) $)
 ($ foreign "spawn" spawn (( ((:unit) :unit) ) :unit) $)
 ($ foreign "yield" yield ((:unit) :unit) $)
-($ foreign "newline" newline ((:unit) :unit)   $)
+($ foreign pure "newline" newline ((:unit) :unit)  $)
+($ foreign pure "sleep"   sleep   ((:int) :unit)  $)
 
 (display "HELLO FORK")
+(newline)
 
 ($ typeof thread1 ((:unit) :unit) $)
 ($ typeof thread2 ((:unit) :unit) $)
 
 (define (thread1)
+  (yield)
   (display "PING")
   (newline)
   (yield)
@@ -18,6 +21,7 @@
 (define (thread2)
   (display "PONG")
   (newline)
+  (sleep 1)
   (yield)
   (thread2)
 )
@@ -28,8 +32,10 @@
 (spawn
   (lambda ()
     (begin
+    (newline)
     (display "MEMEME")
-    (newline))
+    (newline)
+    )
   )
 )
 
