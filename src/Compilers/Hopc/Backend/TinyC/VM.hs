@@ -171,7 +171,7 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as,
             callv (I.Direct n _)  as = as
             callv (I.Closure n _) as = n:as
 
-    callOf (I.Call l (I.Direct n _) args r) (TFun (TFunForeign nm) _ rt) = do
+    callOf (I.Call l (I.Direct n _) args r) (TFun (TFunForeign _ nm) _ rt) = do
       uns <- mapM (\x -> unspill x Nothing) args >>= return . concat
       rs <- mapM reg args
       callRet rt r (chunkMs . CallF l nm rs) >>= \x -> chunkM $ uns ++ x
@@ -180,7 +180,7 @@ fromIR dict live ra p@(I.Proc {I.entry = e, I.body = g, I.name = n, I.args = as,
         chunkM [Nop]
 --      error "Local closure call" -- FIXME ASAP
 
-    callOf (I.Call l (I.Closure n _) args r) (TFun (TFunForeign _) _ rt) = do 
+    callOf (I.Call l (I.Closure n _) args r) (TFun (TFunForeign _ _) _ rt) = do
       error "Foreign closure call" -- FIXME ASAP
 
     callOf _ _ = do

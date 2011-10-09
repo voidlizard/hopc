@@ -10,7 +10,7 @@ import Compilers.Hopc.Typing.Types
 import Debug.Trace
 import Text.Printf
 
-data TFunSpec = TFunForeign KId | TFunLocal deriving (Eq, Show, Ord, Data, Typeable)
+data TFunSpec = TFunForeign Bool KId | TFunLocal deriving (Eq, Show, Ord, Data, Typeable)
 
 data HType = TVar TypeId | TAny TypeId
              | TInt | TStr | TBool | TUnit | TFun TFunSpec [HType] HType

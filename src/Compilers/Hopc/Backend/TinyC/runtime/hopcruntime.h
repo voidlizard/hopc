@@ -12,6 +12,7 @@
 
 typedef unsigned long hword_t;
 typedef uint16_t hregmask;
+typedef uint64_t htime_t; // FIXME: system-dependent
 
 typedef union {
 	hword_t *p;
@@ -20,6 +21,10 @@ typedef union {
 
 //typedef unsigned  hword_t;
 typedef hword_t htag;
+
+#define HOPCTIMEDIV 1000
+
+#define HOPCTASKQT 1000
 
 #define HOPCMAXRECORDFIELDS 64 // TODO: remove hardcode
 
@@ -117,6 +122,7 @@ void hopc_gc_mark_root_alive(hopc_runtime *runtime, memchunk *chunk);
 hopc_task *hopc_find_task(hopc_runtime *runtime, hword_t id);
 hopc_task *hopc_insert_task(hopc_runtime *runtime);
 void hopc_delete_task(hopc_runtime *runtime, hword_t id);
+void hopc_switch_task(hopc_runtime *runtime, htime_t delta);
 
 hword_t hopc_tagsize(hopc_runtime *r, htag tag); 
 
@@ -131,6 +137,8 @@ void hopc_spill(hopc_runtime *r, hword_t slot, hcell data);
 hcell hopc_unspill(hopc_runtime *r, hword_t slot);
 
 void hopc_out_of_mem_hook(hopc_runtime*);
+
+htime_t hopc_getcputime();
 
 #define BITGET(t, n) ((t)&(1<<(n)))
 

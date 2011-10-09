@@ -262,7 +262,7 @@ withWrappers cl = do
   let bs = M.fromList [(n,n) | (CMakeCls n args) <- universe cl]
   let fs = e `M.intersection` bs
   (_,funcs) <- runWriterT $ 
-    forM_ (M.toList fs) $ ifNativeFun $ \(n,t@(TFun (TFunForeign fn) a r)) -> do
+    forM_ (M.toList fs) $ ifNativeFun $ \(n,t@(TFun (TFunForeign _ fn) a r)) -> do
       tmps <- lift $ mapM (const nextTmp) a >>= return . map (((++) "ta_").show)
       let wrap = (fname_wrap n)
 --      trace (printf "%s %s %s" wrap  (show t) (show tmps)) $ return ()
@@ -275,7 +275,7 @@ withWrappers cl = do
 
   where 
     ifNativeFun :: ((KId, HType) -> WT ()) -> (KId, HType) -> WT () 
-    ifNativeFun m x@(n, TFun (TFunForeign  fn) a r) = m x 
+    ifNativeFun m x@(n, TFun (TFunForeign _ fn) a r) = m x
     ifNativeFun m _ = return ()
   
     trCls r (CMakeCls n args) = maybe Nothing (\n -> Just (CMakeCls n args)) (M.lookup n r)

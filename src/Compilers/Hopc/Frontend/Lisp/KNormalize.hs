@@ -216,7 +216,7 @@ kTypeofFn native (ETypeFunDecl o (ETypeList _ ttypes _) ttype c) =
         rt = kTypeof ttype
         ft = case native of
                Nothing -> TFunLocal
-               Just n  -> TFunForeign n
+               Just n  -> TFunForeign True n -- FIXME: all functions are considered pure
     in TFun ft at rt
 
 kTypeofFn _ _ = error "BAD TYPE DECL" -- FIXME

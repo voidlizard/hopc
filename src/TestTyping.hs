@@ -24,8 +24,8 @@ main = do
                 ,(TVar "_tmp5_6",TStr)
                 ,(TVar "_tmp7_7",TFun TFunLocal [] TUnit)
                 ,(TVar "_tmp7_7",TVar "fput_5")
-                ,(TVar "display",TFun (TFunForeign "display") [TStr] TUnit)
-                ,(TVar "newline",TFun (TFunForeign "newline") [TUnit] TUnit)]
+                ,(TVar "display",TFun (TFunForeign False "display") [TStr] TUnit)
+                ,(TVar "newline",TFun (TFunForeign False "newline") [TUnit] TUnit)]
 
   let (Right t2) = I.infer constr
   putStrLn $ intercalate "\n" (map show constr)

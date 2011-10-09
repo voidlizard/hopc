@@ -27,8 +27,9 @@
 
 (spawn
   (lambda ()
+    (begin
     (display "MEMEME")
-    (newline)
+    (newline))
   )
 )
 

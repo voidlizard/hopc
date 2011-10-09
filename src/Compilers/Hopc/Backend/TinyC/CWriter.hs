@@ -111,7 +111,6 @@ write ep p = do
       indent $ "int main() {"
       pushIndent
       indent $ stmt $ "static hopc_runtime runtime = { .tagdata = tagdata }"
-
       empty
 
       indent $ stmt $ "hopc_init_runtime(&runtime, heap, HOPCINITIALHEAPSIZE)"
@@ -129,7 +128,7 @@ write ep p = do
     entrypoint :: CWriterM () -> CWriterM () 
     entrypoint m = do
       indent "void hopc_entrypoint(hopc_runtime *runtime) {"
-
+      shift $ stmt $ "htime_t tasktime = HOPCTASKQT, lasttime = 0, delta = 0"
       shift $ stmt $ regType ++ " " ++ intercalate ", " (map reg R.allRegs)
       empty
       lep <- funEntry ep
@@ -147,6 +146,20 @@ write ep p = do
       shift $ stmt $ "hopc_gc_collect(runtime)"
       popIndent
       shift $ "}"
+      empty
+
+      shift $ stmt $ printf "delta = hopc_getcputime() - lasttime"
+      shift $ stmt $ printf "tasktime = delta < tasktime ? tasktime - delta : 0"
+      shift $ "if( !tasktime ) {"
+      pushIndent
+      shift $ stmt $ "fprintf(stderr, \"IT'S CONTEXT SWITCHING TIME!\\n\")"
+      storeTaskRegs
+      shift $ stmt $ "hopc_switch_task(runtime, delta)"
+      shift $ stmt $ printf "tasktime = HOPCTASKQT"
+      popIndent
+      shift $ "}" 
+      shift $ stmt $ printf "lasttime = hopc_getcputime()"
+
       empty
       pushIndent
       indent $ printf "switch(W(%s)) {" (reg retReg)

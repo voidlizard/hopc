@@ -137,6 +137,18 @@ void hopc_delete_task(hopc_runtime *runtime, hword_t id) {
     }
 }
 
+void hopc_switch_task(hopc_runtime *runtime, htime_t delta) {
+    hopc_task *tp;
+    if( runtime->taskheadp && runtime->tasktailp != runtime->taskheadp ) {
+        fprintf(stderr, "DO SWITCH TASK\n");
+        tp = runtime->taskheadp;
+        runtime->taskheadp = runtime->taskheadp->next;
+        runtime->tasktailp->next = tp;
+        tp->next = 0;
+        runtime->tasktailp = tp;
+    }
+}
+
 memchunk *hopc_make_activation_record(hopc_runtime *runtime, htag tag) {
     hcell *chunk = hopc_gc_alloc_chunk(runtime, tag);
     hopc_ar *arp = 0;

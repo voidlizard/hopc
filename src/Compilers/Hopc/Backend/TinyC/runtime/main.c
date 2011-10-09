@@ -41,11 +41,17 @@ int main() {
     printf("hopc_task: %d %d\n", sizeof(hopc_task), hopc_tagsize(&runtime, HOPCTASKTAG));
     printf("HOPC_AR_HEAD: %d\n", HOPC_AR_HEAD);
     printf("hopc_closure: %d %d\n", sizeof(hopc_closure), CELLS(sizeof(hopc_closure)));
+    printf("long long: %d\n", sizeof(long long int));
+    printf("htime_t: %d\n", sizeof(htime_t));
 
 /*    dump_heap_raw(&runtime);*/
 
     hopc_init_runtime(&runtime, heap, (sizeof(heap)/sizeof(hcell)));
     srand(time(0));
+
+    printf("cputime: %d\n", hopc_getcputime());
+
+    exit(0);
 
     total = hopc_gc_maxmem(&runtime) - hopc_gc_freemem(&runtime);
     printf("; top: 0x%08X end: 0x%08X, total: %d, free: %d\n", runtime.gc.top, runtime.gc.heapend_p, total, hopc_gc_freemem(&runtime));
