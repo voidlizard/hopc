@@ -133,7 +133,7 @@ write ep p = do
     entrypoint :: Label -> CWriterM () -> CWriterM () 
     entrypoint exitL m = do
       indent "void hopc_entrypoint(hopc_runtime *runtime) {"
-      shift $ stmt $ "htime_t tasktime = HOPCTASKQT, lasttime = 0, delta = 0"
+      shift $ stmt $ "htime_t lasttime = 0, delta = 0"
       shift $ stmt $ regType ++ " " ++ intercalate ", " ("RS" : map reg R.allRegs)
       empty
       lep <- funEntry ep
@@ -144,7 +144,6 @@ write ep p = do
       storeTaskRegs
       shift $ stmt $ "hopc_spawn_task(runtime, RS)"
       restoreTaskRegs
-      shift $ stmt $ printf "tasktime = HOPCTASKQT"
       popIndent
       empty
       gotoLabel entrypointLabel
@@ -161,20 +160,45 @@ write ep p = do
       shift $ "}"
       empty
 
+      gotoLabel schedulelabel
+ 
+      empty
+
       shift $ stmt $ printf "delta = hopc_getcputime() - lasttime"
-      shift $ stmt $ printf "tasktime = delta < tasktime ? tasktime - delta : 0"
-      shift $ "if( !tasktime ) {"
+      shift $ stmt $ printf "runtime->tasktime = delta < runtime->tasktime ? runtime->tasktime - delta : 0"
+      shift $ "if( !runtime->tasktime ) {"
       pushIndent
 --      shift $ stmt $ "fprintf(stderr, \"IT'S CONTEXT SWITCHING TIME!\\n\")"
+      shift $  "if( CURRENT(runtime) ) {"
+      pushIndent
       storeTaskRegs
+      popIndent
+      shift "}"
       shift $ stmt $ "hopc_switch_task(runtime, delta)"
+
       empty
+
+      shift $ "if( !HOPC_HAS_TASKS(runtime) )"
+      pushIndent
+      shift $ goto' programexitlabel;
+      popIndent
+
+      empty
+
+      shift $ "if( !CURRENT(runtime) ) {"
+      pushIndent
+      shift $ stmt $ "if( runtime->idle ) hopc_system_sleep(runtime->idle)"
+      shift $ stmt $ "runtime->tasktime = 0"
+      shift $ goto' schedulelabel
+      popIndent
+      shift $ "}"
+
+      empty
+
       restoreTaskRegs
-      shift $ stmt $ printf "tasktime = HOPCTASKQT"
+      shift $ stmt $ printf "lasttime = hopc_getcputime()"
       popIndent
       shift $ "}" 
-      shift $ stmt $ printf "lasttime = hopc_getcputime()"
-
       empty
       pushIndent
       indent $ printf "switch(W(%s)) {" (reg retReg)
@@ -182,21 +206,14 @@ write ep p = do
       m
       gotoLabel exitpointLabel
       caseLabel exitL
+      indent $ stmt "hopc_detach_current(runtime)"
+      indent $ goto' schedulelabel
+      empty
+
+      gotoLabel programexitlabel
       indent $ "default:"
-      shift $ stmt "hopc_detach_task(runtime)"
-      shift $ "if(!runtime->taskheadp)"
-      pushIndent
       shift $ stmt "break"
-      popIndent
-      shift $ "else {"
-      pushIndent
-      restoreTaskRegs
-      shift $ stmt "tasktime=HOPCTASKQT"
-      shift $ goto' entrypointLabel
-      popIndent
       shift $ "}"
-      popIndent
-      indent "}"
       popIndent
       indent "}"
 
@@ -222,6 +239,9 @@ write ep p = do
 
     entrypointLabel = "entrypoint"
     exitpointLabel = "exitpoint"
+
+    programexitlabel = "exit" 
+    schedulelabel = "schedule" 
 
     regType = "register hcell"
 
@@ -428,13 +448,13 @@ write ep p = do
     storeTaskRegs :: CWriterM ()
     storeTaskRegs = do
       forM_ (zip (R.allRegs :: [R]) [(0::Int)..]) $ \(r,i) -> do
-        shift $ stmt $ printf "runtime->taskheadp->regs[%d] = %s" i (reg r)
+        shift $ stmt $ printf "CURRENT(runtime)->regs[%d] = %s" i (reg r)
       empty
 
     restoreTaskRegs :: CWriterM ()
     restoreTaskRegs = do
       forM_ (zip (R.allRegs :: [R]) [(0::Int)..]) $ \(r,i) -> do
-        shift $ stmt $ printf "%s = runtime->taskheadp->regs[%d]" (reg r) i
+        shift $ stmt $ printf "%s = CURRENT(runtime)->regs[%d]" (reg r) i
       empty
 
     funMap :: M.Map KId Proc

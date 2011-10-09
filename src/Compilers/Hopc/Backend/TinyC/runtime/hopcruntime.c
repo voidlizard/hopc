@@ -29,11 +29,73 @@ void hopc_gc_mark_roots(hopc_runtime* r);
 void hopc_gc_mark_root_alive(hopc_runtime *runtime, memchunk *chunk); 
 
 
+static inline void task_ins_head(hopc_task **head, hopc_task *task) {
+    hopc_task *t = 0;
+    t = *head;
+    *head = task;
+    task->next = t;
+}
+
+static inline hopc_task *task_del_head(hopc_task **head) {
+    hopc_task *detached = 0;
+    if( *head ) {
+        detached = *head;
+        *head = (*head)->next;
+    }
+    return detached;
+}
+
+static inline void task_q_init(hopc_task_q *q) {
+    q->first = 0;
+    q->last = &q->first;
+}
+
+static inline void task_q_push(hopc_task_q *q, hopc_task *t) {
+    if( t ) {
+        t->next = 0;
+        *q->last = t;
+        q->last = &t->next; 
+    }
+}
+
+static inline void task_q_push_front(hopc_task_q *q, hopc_task *t) {
+    if( t && !(t->next = q->first) )
+        q->last = &t->next;
+    q->first = t;
+}
+
+static hopc_task *task_q_pop(hopc_task_q *q) {
+    hopc_task *tmp = q->first;
+    if( tmp && !(q->first = q->first->next) ) {
+        q->last = &q->first;
+    }
+    return tmp;
+}
+
+static void task_sweep(hopc_task *t) {
+    if(t) {
+        t->arhead = 0;
+        t->mask = 0;
+        t->id.t.state = HOPC_TASK_TO_DELETE;
+    }
+}
+
+static void hopc_del_dead_tasks(hopc_runtime *rt) {
+    hopc_task *tp = rt->tasks;
+    while( tp && tp->id.t.state == HOPC_TASK_DELETED ) task_del_head(&rt->tasks);
+    for( tp = rt->tasks; tp && tp->next; ) {
+        if( tp->next->id.t.state == HOPC_TASK_DELETED ) {
+            tp->next = tp->next->next;
+            continue;
+        }
+        tp = tp->next; 
+    }
+}
+
 void hopc_out_of_mem_hook(hopc_runtime *r) {
     fprintf(stderr, "*** OUT OF MEMORY");
     exit(-1); // FIXME
 }
-
 
 void hopc_gc_init(hopc_gc *gc, hcell *mem, hword_t size) {
     gc->heapstart_p = mem;
@@ -44,9 +106,13 @@ void hopc_gc_init(hopc_gc *gc, hcell *mem, hword_t size) {
 
 void hopc_init_runtime(hopc_runtime *runtime, hcell *mem, hword_t size) {
     hopc_gc_init(&(runtime->gc), mem, size);
-    runtime->taskheadp = 0;
-    runtime->tasktailp = 0;
+    runtime->tasks = 0;
+    task_q_init(&runtime->workers);
+    task_q_init(&runtime->sleepers);
     runtime->taskid = 0;
+    runtime->taskqt = HOPCTASKQT;
+    runtime->tasktime = runtime->taskqt;
+    runtime->idle = 0;
 }
 
 hword_t hopc_tagsize(hopc_runtime *r, htag tag) {
@@ -89,9 +155,9 @@ memchunk *hopc_get_task_chunk(hopc_runtime *r, hopc_task *t) {
 }
 
 hopc_task *hopc_find_task(hopc_runtime *runtime, hword_t id) {
-    hopc_task *p = runtime->taskheadp;
-    for(; p && p->id != id; p = p->next );
-    if( p && p->id == id ) return p;
+    hopc_task *p = runtime->tasks;
+    for(; p && p->id.t.id != id; p = p->next );
+    if( p && p->id.t.id == id ) return p;
     return 0;
 }
 
@@ -100,60 +166,41 @@ hopc_task *hopc_insert_task(hopc_runtime *runtime) {
     hopc_task *t = 0;
     ((memchunk*)chunk)->t.gc_follow = 0;
     t = (hopc_task*)hopc_gc_chunk_start(runtime, (hcell*)chunk);
-    t->id = runtime->taskid++;
-    t->next = runtime->taskheadp;
-    runtime->taskheadp = t;
-/*    fprintf(stderr, "ALLOC TASK CHUNK: 0x%08X 0x%08X\n", t, chunk);*/
+
     hopc_gc_mark_root_alive(runtime, ((memchunk*)chunk));
+
+    t->id.t.id = ++runtime->taskid;
+    t->id.t.state = HOPC_TASK_ALIVE;
+    t->tsleep = 0;
+    t->tsleep_since = 0;
     t->arhead = 0;
     memset(t->regs, 0, sizeof(hcell)*HOPCREGNUM);
     t->mask = 0;
-
-    if( !runtime->tasktailp ) {
-      runtime->tasktailp = t;
-    }
+ 
+    task_ins_head(&runtime->tasks, t);
+    task_q_push_front(&runtime->workers, t);
 
     return t;
 }
 
-void hopc_detach_task(hopc_runtime *runtime) {
-  if( runtime->taskheadp ) {
-    runtime->taskheadp = runtime->taskheadp->next;
-  }
-/*  fprintf(stderr, "detached: %08X\n", runtime->taskheadp); */
+void hopc_detach_current(hopc_runtime *runtime) {
+    if( CURRENT(runtime) ) {
+        task_sweep(CURRENT(runtime));
+/*        fprintf(stderr, "DETACH TASK %08X\n", CURRENT(runtime));*/
+        runtime->tasktime = 0;
+    }
 }
 
 void hopc_delete_task(hopc_runtime *runtime, hword_t id) {
-    hopc_task *p = runtime->taskheadp;
     hopc_task *t = hopc_find_task(runtime, id);
-
-    if( t == runtime->taskheadp ) {
-        runtime->taskheadp = t->next;
-    } else {
-      for(; t && p && p->next != t ; p = p->next );
-      if( p && p->next == t ) {
-          p->next = t->next;
-      }
-    }
-
-    for( p = runtime->taskheadp; p; p = p->next ) {
-      if( !p->next ) {
-        runtime->tasktailp = p;
-        break;
-      }
-    }
+    task_sweep(t);
 }
 
-void hopc_switch_task(hopc_runtime *runtime, htime_t delta) {
-    hopc_task *tp;
-    if( runtime->taskheadp && runtime->tasktailp != runtime->taskheadp ) {
-/*        fprintf(stderr, "DO SWITCH TASK\n");*/
-        tp = runtime->taskheadp;
-        runtime->taskheadp = runtime->taskheadp->next;
-        runtime->tasktailp->next = tp;
-        tp->next = 0;
-        runtime->tasktailp = tp;
-/*        fprintf(stderr, "TASK SWITCHED: %08X R0: %d\n", runtime->taskheadp, W(runtime->taskheadp->regs[0]));*/
+void hopc_ffi__sleep(hopc_runtime *runtime, hcell cell) {
+    if( CURRENT(runtime) ) {
+        CURRENT(runtime)->tsleep_since = hopc_getcputime(runtime);
+        CURRENT(runtime)->tsleep = HOPC_TICKS_OF_MILLIS(W(cell));
+        runtime->tasktime = 0;
     }
 }
 
@@ -163,7 +210,69 @@ void hopc_spawn_task(hopc_runtime *runtime, hcell cell) {
   hopc_closure *cp = (hopc_closure*)hopc_gc_chunk_start(runtime, (hcell*)P(cell));
   tp->regs[0] = cp->cp;
   tp->arhead = (hopc_ar*)hopc_gc_chunk_start(runtime, (hcell*)P(cp->ar));
+  runtime->tasktime = runtime->taskqt;
 /*  fprintf(stderr, "SPAWN %08X R0: %d\n", tp, W(tp->regs[0]));*/
+}
+
+
+void hopc_switch_task(hopc_runtime *rt, htime_t delta) {
+    rt->tasktime = rt->taskqt;
+    rt->idle = 0;
+
+    if( rt->workers.first && rt->workers.first->id.t.state == HOPC_TASK_TO_DELETE ) {
+        rt->workers.first->id.t.state = HOPC_TASK_DELETED;
+        task_q_pop(&rt->workers);
+    }
+
+    if( rt->sleepers.first && rt->sleepers.first->id.t.state == HOPC_TASK_TO_DELETE ) {
+        rt->sleepers.first->id.t.state = HOPC_TASK_DELETED;
+        task_q_pop(&rt->sleepers);
+    }
+
+    if( !rt->workers.first && rt->sleepers.first ) {
+/*        sleep(1);*/
+/*        fprintf(stderr, "IDLE!\n");*/
+    }
+
+    if( rt->sleepers.first ) {
+/*        fprintf(stderr, "SLEEP\n");*/
+        htime_t sleep = rt->sleepers.first->tsleep;
+        htime_t since = rt->sleepers.first->tsleep_since;
+        htime_t now = hopc_getcputime(rt);
+        htime_t delta = since > now ? ((now - since) & HTIME_MAX) : now - since;
+/*        fprintf(stderr, "sleep %d since %d now %d delta: %d\n", sleep, since, now, delta);*/
+        if( delta >= sleep ) {
+/*            fprintf(stderr, "EXPIRED!\n");*/
+/*            exit(-1);*/
+            rt->sleepers.first->tsleep = 0;
+            rt->sleepers.first->tsleep_since = 0;
+            task_q_push_front(&rt->workers, task_q_pop(&rt->sleepers));
+            return;
+        }
+        task_q_push(&rt->sleepers, task_q_pop(&rt->sleepers));
+    }
+
+    do {
+        if( rt->workers.first ) {
+            if( rt->workers.first->tsleep ) {
+                task_q_push(&rt->sleepers, task_q_pop(&rt->workers));
+                rt->tasktime = 0;
+/*                fprintf(stderr, "GO TO SLEEP: %d\n", rt->workers.first->id.t.id);*/
+            } else {
+                task_q_push(&rt->workers, task_q_pop(&rt->workers));
+            }
+        }
+    } while( rt->workers.first && rt->workers.first->tsleep );
+
+    if( !rt->workers.first && rt->sleepers.first ) {
+        htime_t idle = rt->sleepers.first->tsleep;
+        hopc_system_sleep( rt->sleepers.first->tsleep );
+        rt->tasktime = 0;
+        hopc_system_sleep(idle < HOPC_SCHEDULER_IDLE_TICKS?idle:HOPC_SCHEDULER_IDLE_TICKS);
+    }
+
+/*    fprintf(stderr, "task switched %d w: %08X s: %08X idle: %d\n", rt->workers.first->id.t.id, rt->workers.first, rt->sleepers.first, rt->idle)*/
+
 }
 
 memchunk *hopc_make_activation_record(hopc_runtime *runtime, htag tag) {
@@ -178,9 +287,9 @@ memchunk *hopc_make_activation_record(hopc_runtime *runtime, htag tag) {
 
 hopc_ar *hopc_push_activation_record2(hopc_runtime *runtime, memchunk *chunk) {
     hopc_ar *arp = (hopc_ar*)hopc_gc_chunk_start(runtime, (hcell*)chunk);
-    if( runtime->taskheadp ) {
-        arp->next = runtime->taskheadp->arhead;
-        runtime->taskheadp->arhead = arp;
+    if( CURRENT(runtime) ) {
+        arp->next = CURRENT(runtime)->arhead;
+        CURRENT(runtime)->arhead = arp;
     }
     return arp;
 }
@@ -191,9 +300,9 @@ hopc_ar *hopc_push_activation_record(hopc_runtime *runtime, htag tag) {
 }
 
 void hopc_pop_activation_record(hopc_runtime *r) {
-    hopc_ar *arp = r->taskheadp ? r->taskheadp->arhead : 0;
+    hopc_ar *arp = CURRENT(r) ? CURRENT(r)->arhead : 0;
     if( arp ) {
-        r->taskheadp->arhead = arp->next;
+        CURRENT(r)->arhead = arp->next;
     }
 }
 
@@ -214,17 +323,17 @@ hcell *hopc_make_closure(hopc_runtime *runtime, hword_t label, hcell *archunk, h
 
 void hopc_fix_closure(hopc_runtime *runtime, hword_t label, hcell *chunk) {
     hopc_closure *closp = (hopc_closure*)hopc_gc_chunk_start(runtime, chunk);
-    hopc_ar *arp = hopc_gc_chunk_start(runtime, (hcell*)closp->ar.p);
+    hopc_ar *arp = (hopc_ar*)hopc_gc_chunk_start(runtime, (hcell*)closp->ar.p);
 /*    fprintf(stderr, "FIXING CLOSURE: %d\n", label);*/
     arp->slots[0].w = label;
 }
 
 void hopc_spill(hopc_runtime *r, hword_t slot, hcell data) {
-  r->taskheadp->arhead->slots[slot] = data;
+    CURRENT(r)->arhead->slots[slot] = data;
 }
 
 hcell hopc_unspill(hopc_runtime *r, hword_t slot) {
-  return r->taskheadp->arhead->slots[slot];
+    return CURRENT(r)->arhead->slots[slot];
 }
 
 #define BMASKWORD(i) ((i)/(sizeof(hregmask)*2))
@@ -240,23 +349,17 @@ void hopc_gc_update_chunk_pointers(hopc_runtime *r, hcell* lb, hword_t shift, hw
 }
 
 void hopc_gc_collect(hopc_runtime* r) {
-/*    fprintf(stderr, "hopc_gc_collect\n");*/
-/*    fprintf(stderr, "before markup\n");*/
-/*    dump_heap3(r);*/
+    hopc_del_dead_tasks(r);
     hopc_gc_mark_roots(r);
     hopc_gc_mark(r);
-/*    fprintf(stderr, "after markup\n");*/
-/*    dump_heap3(r);*/
     hopc_gc_compact(r);
     hopc_gc_mark_dead(r);
 }
 
 void hopc_gc_mark_chunk_pointers(hopc_runtime *r, hword_t size, hcell *raw, const hregmask *mask) {
     hword_t i = 0;
-/*    fprintf(stderr, "hopc_gc_mark_chunk_pointers\n");*/
     for(i = 0; i < size; i++) {
         if( BITGET(mask[BMASKWORD(i)], BOFF(i)) ) {
-/*            fprintf(stderr, "marking slot %d [%08X] as pointer\n", i, raw[i].p);*/
             hopc_gc_mark_root_alive(r, (memchunk*)(raw[i].p));
         }
     }
@@ -265,7 +368,6 @@ void hopc_gc_mark_chunk_pointers(hopc_runtime *r, hword_t size, hcell *raw, cons
 hopc_ar *hopc_gc_update_ar_pointers(hopc_runtime *r, hopc_task *tp, hcell *lb, hword_t shift) {
     hopc_ar *p = tp->arhead, *p2 = 0;
     while(p) {
-/*        fprintf(stderr, "hopc_gc_update_ar_pointers\n");*/
         hcell *chunk = hopc_ar_chunk_start(r, p);
         if(p2) p2->next = (hopc_ar*)PTRSHIFT(((hcell*)p2->next), lb, shift);
         p2 = p;
@@ -276,23 +378,21 @@ hopc_ar *hopc_gc_update_ar_pointers(hopc_runtime *r, hopc_task *tp, hcell *lb, h
     return (hopc_ar*)PTRSHIFT(tp->arhead, lb, shift);
 }
 
-
 void hopc_gc_update_task_pointers(hopc_runtime *r, hcell *lb, hword_t shift) {
     hopc_task *p2 = 0;
-    hopc_task *p = r->taskheadp;
-/*    fprintf(stderr, "update task pointers: [0x%08X] 0x%08X %d\n", r->taskheadp, lb, shift);*/
+    hopc_task *p = r->tasks;
     while(p) {
         if(p2) p2->next = (hopc_task*)PTRSHIFT(p2->next, lb, shift);
         p2 = p;
-/*        fprintf(stderr, "p: %08X\n", p);*/
         p->arhead = hopc_gc_update_ar_pointers(r, p, lb, shift);
         hopc_gc_update_chunk_pointers(r, lb, shift, HOPCREGNUM, p->regs, &(p->mask));
-/*        fprintf(stderr, "p: %08X updated ok\n", p);*/
         p = p->next;
     }
-/*    fprintf(stderr, "update task pointers: [0x%08X] 0x%08X %d finished ok\n", r->taskheadp, lb, shift);*/
-    r->taskheadp = (hopc_task*)PTRSHIFT(r->taskheadp, lb, shift);
-/*    exit(-1);*/
+    r->tasks = (hopc_task*)PTRSHIFT(r->tasks, lb, shift);
+    r->workers.first  = (hopc_task*)PTRSHIFT(r->workers.first, lb, shift);
+    *r->workers.last  = (hopc_task*)PTRSHIFT(*(r->workers.last), lb, shift);
+    r->sleepers.first = (hopc_task*)PTRSHIFT(r->sleepers.first, lb, shift);
+    *r->sleepers.last = (hopc_task*)PTRSHIFT(*(r->sleepers.last), lb, shift);
 }
 
 hword_t hopc_gc_maxmem(hopc_runtime *r) {
@@ -441,22 +541,15 @@ void hopc_gc_mark_activation_record(hopc_runtime *r, hopc_ar *p) {
 }
 
 void hopc_gc_mark_roots(hopc_runtime* r) {
-    hopc_task *p = r->taskheadp;
+    hopc_task *p = r->tasks;
     hcell *chunk = 0;
-
-/*    fprintf(stderr, "hopc_gc_mark_roots\n");*/
-/*    fprintf(stderr, "TASK HEAD: 0x%08X\n", p);*/
-
     for(; p; p = p->next ) {
         chunk = (hcell*)hopc_get_task_chunk(r, p);
-/*        fprintf(stderr, "FOUND TASK CHUNK: 0x%08X 0x%08X\n", p, chunk);*/
-/*        fprintf(stderr, "AR: 0x%08X\n", p->arhead);*/
         hopc_gc_mark_activation_record(r, p->arhead);
         hopc_gc_mark_root_alive(r, (memchunk*)chunk);
         hopc_gc_mark_chunk_pointers(r, HOPCREGNUM, p->regs, &(p->mask));
     }
 }
-
 
 void hopc_gc_mark_root_alive(hopc_runtime *runtime, memchunk *chunk) {
     if( ((hcell*)chunk) >= runtime->gc.heapstart_p 

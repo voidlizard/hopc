@@ -14,6 +14,8 @@ typedef unsigned long hword_t;
 typedef uint16_t hregmask;
 typedef uint64_t htime_t; // FIXME: system-dependent
 
+#define HTIME_MAX ((htime_t)(-1))
+
 typedef union {
 	hword_t *p;
 	hword_t  w;
@@ -21,6 +23,9 @@ typedef union {
 
 //typedef unsigned  hword_t;
 typedef hword_t htag;
+
+// FIXME: move to hopcruntime.c
+#define TAGBITS(n) ((sizeof(hword_t))*8-(n))
 
 #define HOPCTIMEDIV 1000
 
@@ -39,6 +44,10 @@ typedef hword_t htag;
 #define W(x) ((x).w)
 
 #define S(x) ((hword_t*)(x))
+
+#define HOPC_TICKS_OF_MILLIS(x) ((x)*HOPCTIMEDIV)
+
+#define HOPC_SCHEDULER_IDLE_TICKS 10000
 
 typedef struct __hopctagdata {
     hword_t size;
@@ -70,34 +79,58 @@ typedef struct __closure {
 #define CLOSURE_CP(r, x) (((hopc_closure*)hopc_gc_chunk_start(runtime, (hcell*)((x).p)))->cp)
 
 #define HOPCTASKMASKSIZE BITVECTSIZE(HOPCREGNUM)
-#define HOPCTASKREGMASK(r, m) ((r)->taskheadp->mask = (m))
+#define HOPCTASKREGMASK(r, m) (CURRENT((r))->mask = (m))
+
+#define HOPC_TASK_ALIVE     0
+#define HOPC_TASK_TO_DELETE 1
+#define HOPC_TASK_DELETED   2
+
+typedef union __task_id {
+    struct {
+        unsigned int state:2;
+        hword_t id:TAGBITS(2);
+    } t;
+    hword_t _skip;
+} hopc_task_id;
 
 typedef struct __task {
     struct __task *next;
     hopc_ar *arhead;
     hcell regs[HOPCREGNUM];
-    hword_t id;
+    hopc_task_id id;
     hregmask mask;
+    htime_t tsleep;
+    htime_t tsleep_since;
 } hopc_task;
 
 typedef struct {
+    hopc_task *first;
+    hopc_task **last;
+} hopc_task_q;
+
+typedef struct {
     hopc_gc gc;
-    hopc_task *taskheadp;
-    hopc_task *tasktailp;
+    hopc_task *tasks;
+    hopc_task_q workers;
+    hopc_task_q sleepers;
     hword_t taskid;
+    htime_t taskqt;
+    htime_t tasktime;
+    htime_t idle;
     const hopc_tagdata *tagdata;
 } hopc_runtime;
 
 #define HOPC_GC_TRESHOLD(r) (hopc_gc_maxmem((r))/4)
 
-// FIXME: move to hopcruntime.c
-#define TAGBITS ((sizeof(hword_t))*8-2)
+#define CURRENT(r) ((r)->workers.first)
+#define HOPC_HAS_TASKS(r) ((r)->workers.first || (r->sleepers.first))
+
 typedef struct __memchunk {
     union {
         struct {
             unsigned gc_alive:1;
             unsigned gc_follow:1;
-            hword_t tag:TAGBITS;
+            hword_t tag:TAGBITS(2);
         } t; 
         hcell cell;
     };
@@ -124,9 +157,11 @@ hopc_task *hopc_insert_task(hopc_runtime *runtime);
 void hopc_delete_task(hopc_runtime *runtime, hword_t id);
 void hopc_switch_task(hopc_runtime *runtime, htime_t delta);
 void hopc_spawn_task(hopc_runtime*, hcell);
-void hopc_detach_task(hopc_runtime *runtime);
+void hopc_detach_current(hopc_runtime *runtime);
 
-#define hopc_ffi__yield(r)  (tasktime=0)
+void hopc_ffi__sleep(hopc_runtime*, hcell);
+
+#define hopc_ffi__yield(r)  ((r)->tasktime=0)
 #define hopc_ffi__spawn(r,c) {RS=(c);goto spawn;}
 
 hword_t hopc_tagsize(hopc_runtime *r, htag tag); 
@@ -145,6 +180,8 @@ hcell hopc_unspill(hopc_runtime *r, hword_t slot);
 void hopc_out_of_mem_hook(hopc_runtime*);
 
 htime_t hopc_getcputime();
+
+void hopc_system_sleep(htime_t);
 
 #define BITGET(t, n) ((t)&(1<<(n)))
 

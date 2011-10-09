@@ -3,8 +3,7 @@
 
 #include <hopcruntime.h>
 
-void hopc_ffi__display(hcell);
-void hopc_ffi__newline();
-void hopc_ffi__sleep(hcell);
+void hopc_ffi__display(hopc_runtime*, hcell);
+void hopc_ffi__newline(hopc_runtime*);
 
 #endif
