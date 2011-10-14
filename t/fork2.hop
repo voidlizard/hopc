@@ -47,11 +47,12 @@
   (thread2)
 )
 
+
 (define (thread3)
   (display "BOOM")
   (newline)
 ;  (yield)
-  (sleep 10000)
+  (sleep 1000)
   (thread3)
 )
 
@@ -60,9 +61,9 @@
 (display "HELLO FORK")
 (newline)
 
+(spawn thread1)
 (spawn thread3)
 (spawn thread2)
-(spawn thread1)
 
 (spawn
   (lambda ()

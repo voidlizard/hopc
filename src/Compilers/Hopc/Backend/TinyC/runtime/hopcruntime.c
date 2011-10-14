@@ -339,6 +339,8 @@ void hopc_gc_update_chunk_pointers(hopc_runtime *r, hcell* lb, hword_t shift, hw
 }
 
 void hopc_gc_collect(hopc_runtime* r) {
+/*    dump_tasks(r);*/
+/*    fprintf(stderr, "\nCURRENT %08X\n", CURRENT(r));*/
     hopc_gc_mark_roots(r);
 /*    fprintf(stderr, "*** SURVIVED MARK ROOTS ****\n");*/
     hopc_gc_mark(r);
@@ -346,6 +348,9 @@ void hopc_gc_collect(hopc_runtime* r) {
     hopc_gc_compact(r);
 /*    fprintf(stderr, "*** SURVIVED GC ****\n");*/
     hopc_gc_mark_dead(r);
+/*    dump_tasks(r);*/
+/*    fprintf(stderr, "\nCURRENT %08X\n", CURRENT(r));*/
+    r->tasktime = 0;
 }
 
 void hopc_gc_mark_chunk_pointers(hopc_runtime *r, hword_t size, hcell *raw, const hregmask *mask) {
