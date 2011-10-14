@@ -110,7 +110,6 @@ typedef struct {
 
 typedef struct {
     hopc_gc gc;
-    hopc_task *tasks;
     hopc_task_q workers;
     hopc_task_q sleepers;
     hword_t taskid;

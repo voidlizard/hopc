@@ -1,0 +1,76 @@
+($ foreign "display" display ((:string) :unit) $)
+($ foreign "spawn" spawn (( ((:unit) :unit) ) :unit) $)
+($ foreign "yield" yield ((:unit) :unit) $)
+($ foreign "newline" newline ((:unit) :unit)  $)
+($ foreign "sleep" sleep ((:int) :unit) $)
+
+(define (fa) "A")
+(define (fb) "B")
+
+(define (func1) (let ((s (fa)) (s1 (fb))) 
+  (lambda (x) (let ((z "qqq"))
+     (begin (display s)
+            (display (fa))
+            (display (fb))
+            (display s1)
+            (display z)
+            (display x)
+            )))))
+
+($ typeof main (( ((:string) :unit) ) :unit) $)
+
+(define (main f)
+
+  ((func1) "C")
+  (display "\n")
+  ((func1) "E")
+  (f "\nEND\n")
+  (sleep 10)
+  (main f)
+
+)
+
+($ typeof thread1 ((:unit) :unit) $)
+($ typeof thread2 ((:unit) :unit) $)
+($ typeof thread3 ((:unit) :unit) $)
+
+
+(define (thread1)
+  (main display)
+)
+
+(define (thread2)
+  (display "PONG")
+  (newline)
+;  (yield)
+  (sleep 200)
+  (thread2)
+)
+
+(define (thread3)
+  (display "BOOM")
+  (newline)
+;  (yield)
+  (sleep 10000)
+  (thread3)
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(display "HELLO FORK")
+(newline)
+
+(spawn thread3)
+(spawn thread2)
+(spawn thread1)
+
+(spawn
+  (lambda ()
+    (begin
+    (newline)
+    (display "MEMEME")
+    (newline)
+    )
+  )
+)
+
